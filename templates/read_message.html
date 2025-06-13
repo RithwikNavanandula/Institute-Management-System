@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+
+{% block title %}Read Message{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-envelope-open me-2"></i>{{ message.subject }}
+                </h4>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        From: <strong>{{ message.sender_name }}</strong> ({{ message.sender_role.title() }}) 
+                        | Sent: {{ message.sent_at }}
+                    </small>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="message-content">
+                    {{ message.message_body }}
+                </div>
+                
+                <hr>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('messages') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Messages
+                    </a>
+                    {% if user_role in ['admin', 'teacher'] %}
+                    <a href="{{ url_for('reply_message', message_id=message.message_id) }}" class="btn btn-primary">
+                        <i class="fas fa-reply me-1"></i>Reply
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.message-content {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 5px;
+    border-left: 4px solid #007bff;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+</style>
+{% endblock %}

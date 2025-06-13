@@ -1,0 +1,175 @@
+{% extends "layout.html" %}
+
+{% block title %}Assessment Management{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-tasks me-2"></i>Assessment Management
+                </h4>
+                <a href="{{ url_for('create_assessment') }}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Create New Assessment
+                </a>
+            </div>
+            <div class="card-body">
+                <!-- Course Filter -->
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <select class="form-select" id="courseFilter" onchange="filterByCourse()">
+                            <option value="">All Courses</option>
+                            {% for course in courses %}
+                            <option value="{{ course.course_name }}">{{ course.course_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Recent Assessments -->
+                <h5 class="mb-3">Recent Assessments</h5>
+                {% if recent_assessments %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Assessment Name</th>
+                                <th>Course</th>
+                                <th>Type</th>
+                                <th>Total Marks</th>
+                                <th>Weightage</th>
+                                <th>Date</th>
+                                <th>Progress</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assessment in recent_assessments %}
+                            <tr data-course="{{ assessment.course_name }}">
+                                <td>
+                                    <strong>{{ assessment.assessment_name }}</strong>
+                                    {% if assessment.description %}
+                                        <br><small class="text-muted">{{ assessment.description[:50] }}{% if assessment.description|length > 50 %}...{% endif %}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ assessment.course_name }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary">{{ assessment.assessment_type }}</span>
+                                </td>
+                                <td>{{ assessment.total_marks }}</td>
+                                <td>{{ assessment.weightage }}%</td>
+                                <td>{{ assessment.assessment_date }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                            {% set progress = (assessment.graded_count / assessment.total_students * 100) if assessment.total_students > 0 else 0 %}
+                                            <div class="progress-bar bg-success" style="width: {{ progress }}%"></div>
+                                        </div>
+                                        <small class="text-muted">{{ assessment.graded_count }}/{{ assessment.total_students }}</small>
+                                    </div>
+                                    <small class="text-muted">{{ "%.1f"|format(progress) }}% Complete</small>
+                                </td>
+                                <td>
+                                    <div class="btn-group-vertical btn-group-sm">
+                                        <a href="{{ url_for('grade_assessment', assessment_id=assessment.assessment_id) }}" 
+                                           class="btn btn-primary btn-sm">
+                                            <i class="fas fa-edit me-1"></i>Grade
+                                        </a>
+                                        {% if user_role == 'admin' %}
+                                        <button type="button" class="btn btn-danger btn-sm" 
+                                                onclick="deleteAssessment({{ assessment.assessment_id }}, '{{ assessment.assessment_name }}')">
+                                            <i class="fas fa-trash me-1"></i>Delete
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-tasks fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No Assessments Found</h5>
+                    <p class="text-muted">Create your first assessment to get started with grading students.</p>
+                    <a href="{{ url_for('create_assessment') }}" class="btn btn-primary">
+                        <i class="fas fa-plus me-2"></i>Create First Assessment
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the assessment "<span id="assessmentName"></span>"?</p>
+                <p class="text-danger"><strong>Warning:</strong> This action cannot be undone and will remove all associated grades.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Delete Assessment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.progress {
+    background-color: #e9ecef;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-top: none;
+    font-weight: 600;
+}
+
+.badge {
+    font-size: 0.75rem;
+}
+
+.btn-group-vertical .btn {
+    margin-bottom: 2px;
+}
+
+.btn-group-vertical .btn:last-child {
+    margin-bottom: 0;
+}
+</style>
+
+<script>
+function filterByCourse() {
+    const filter = document.getElementById('courseFilter').value;
+    const rows = document.querySelectorAll('tbody tr[data-course]');
+    
+    rows.forEach(row => {
+        if (filter === '' || row.getAttribute('data-course') === filter) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function deleteAssessment(assessmentId, assessmentName) {
+    document.getElementById('assessmentName').textContent = assessmentName;
+    document.getElementById('deleteForm').action = `/delete_assessment/${assessmentId}`;
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
+{% endblock %}

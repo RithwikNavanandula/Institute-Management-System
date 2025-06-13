@@ -1,0 +1,154 @@
+{% extends "layout.html" %}
+
+{% block title %}All Student Results{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-users me-2"></i>All Student Results
+                </h4>
+                <form method="get" class="d-flex gap-2">
+                    <select name="course" class="form-select">
+                        <option value="">All Courses</option>
+                        {% for course in courses %}
+                        <option value="{{ course.course_name }}" 
+                                {% if course.course_name == course_filter %}selected{% endif %}>
+                            {{ course.course_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <select name="grade" class="form-select">
+                        <option value="">All Grades</option>
+                        {% for grade in grades %}
+                        <option value="{{ grade }}" {% if grade == grade_filter %}selected{% endif %}>
+                            {{ grade }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                {% if student_performance %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Email</th>
+                                <th>Course</th>
+                                <th>Average %</th>
+                                <th>Final Grade</th>
+                                <th>Status</th>
+                                <th>Total Courses</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for performance in student_performance %}
+                            <tr>
+                                <td>
+                                    <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
+                                    <strong>{{ performance.student_info.name }}</strong>
+                                </td>
+                                <td class="text-muted">{{ performance.student_info.email }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ performance.student_info.course }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if performance.avg_percentage >= 90 %}success{% elif performance.avg_percentage >= 70 %}warning{% elif performance.avg_percentage >= 50 %}info{% else %}danger{% endif %}">
+                                        {{ performance.avg_percentage }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if performance.final_grade in ['A+', 'A', 'A-'] %}success{% elif performance.final_grade in ['B+', 'B', 'B-'] %}primary{% elif performance.final_grade in ['C+', 'C', 'C-'] %}warning{% elif performance.final_grade == 'D' %}info{% else %}danger{% endif %}">
+                                        {{ performance.final_grade }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if performance.status == 'Pass' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check me-1"></i>Pass
+                                        </span>
+                                    {% elif performance.status == 'Fail' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times me-1"></i>Fail
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ performance.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ performance.total_courses }}</span>
+                                </td>
+                                <td>
+                                    <a href="{{ url_for('student_results', student_id=performance.student_info.student_id) }}" 
+                                       class="btn btn-primary btn-sm">
+                                        <i class="fas fa-eye me-1"></i>View Details
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Performance Summary -->
+                <div class="row mt-4">
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <div class="stats-number text-success">
+                                {{ student_performance | selectattr('status', 'equalto', 'Pass') | list | length }}
+                            </div>
+                            <div class="stats-label">Students Passed</div>
+                            <i class="fas fa-trophy fa-2x stats-icon text-success"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <div class="stats-number text-danger">
+                                {{ student_performance | selectattr('status', 'equalto', 'Fail') | list | length }}
+                            </div>
+                            <div class="stats-label">Students Failed</div>
+                            <i class="fas fa-times-circle fa-2x stats-icon text-danger"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <div class="stats-number text-info">
+                                {% set total_avg = student_performance | map(attribute='avg_percentage') | list %}
+                                {% if total_avg %}
+                                    {{ "%.1f"|format(total_avg | sum / total_avg | length) }}%
+                                {% else %}
+                                    0%
+                                {% endif %}
+                            </div>
+                            <div class="stats-label">Class Average</div>
+                            <i class="fas fa-chart-line fa-2x stats-icon text-info"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stats-card">
+                            <div class="stats-number text-primary">{{ student_performance | length }}</div>
+                            <div class="stats-label">Total Students</div>
+                            <i class="fas fa-users fa-2x stats-icon text-primary"></i>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-user-graduate fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No student results found</h5>
+                    <p class="text-muted">Try adjusting your filter criteria or check if assessments have been graded.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

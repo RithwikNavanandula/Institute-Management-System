@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Institute Management System{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <h1><i class="fas fa-graduation-cap me-2"></i>Institute Management System</h1>
+    </div>
+
+    <!-- Main Layout Container -->
+    <div class="main-layout">
+        <!-- Sidebar (only show if user is logged in) -->
+        {% if session.get('user_id') %}
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <!-- User Info -->
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <h6>{{ session.get('user_name') }}</h6>
+                    <small>{{ session.get('user_role').title() }}</small>
+                </div>
+
+                <!-- Navigation Menu -->
+                <nav class="sidebar-nav">
+                    <ul class="nav flex-column">
+                        <!-- Dashboard - Common for all roles -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" 
+                               href="{{ url_for('dashboard') }}">
+                                <i class="fas fa-tachometer-alt"></i>Dashboard
+                            </a>
+                        </li>
+                        
+                        <!-- Admin and Teacher Sections -->
+                        {% if session.get('user_role') in ['admin', 'teacher'] %}
+                        <!-- Account Management -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'pending_accounts' %}active{% endif %}" 
+                               href="{{ url_for('pending_accounts') }}">
+                                <i class="fas fa-user-check"></i>Verify Accounts
+                                {% if pending_accounts_count > 0 %}
+                                    <span class="badge bg-danger">{{ pending_accounts_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        
+                        <!-- Attendance Management -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">Attendance Management</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'attendance' %}active{% endif %}" 
+                               href="{{ url_for('attendance') }}">
+                                <i class="fas fa-calendar-check"></i>Mark Attendance
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'attendance_report' %}active{% endif %}" 
+                               href="{{ url_for('attendance_report') }}">
+                                <i class="fas fa-chart-bar"></i>Attendance Report
+                            </a>
+                        </li>
+
+                        <!-- Assessment & Grading -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">Assessment & Grading</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'assessments' %}active{% endif %}" 
+                               href="{{ url_for('assessments') }}">
+                                <i class="fas fa-tasks"></i>Assessments
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'create_assessment' %}active{% endif %}" 
+                               href="{{ url_for('create_assessment') }}">
+                                <i class="fas fa-plus-circle"></i>Create Assessment
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint in ['all_student_results', 'student_results'] %}active{% endif %}" 
+                               href="{{ url_for('all_student_results') }}">
+                                <i class="fas fa-trophy"></i>View Results
+                            </a>
+                        </li>
+                        
+                        <!-- Notifications -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'create_notification' %}active{% endif %}" 
+                               href="{{ url_for('create_notification') }}">
+                                <i class="fas fa-bell"></i>Create Notification
+                            </a>
+                        </li>
+
+                        <!-- Management Sections -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">Management</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_students' %}active{% endif %}" 
+                               href="{{ url_for('manage_students') }}">
+                                <i class="fas fa-users"></i>Manage Students
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Admin Only Sections -->
+                        {% if session.get('user_role') == 'admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_teachers' %}active{% endif %}" 
+                               href="{{ url_for('manage_teachers') }}">
+                                <i class="fas fa-chalkboard-teacher"></i>Manage Teachers
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_courses' %}active{% endif %}" 
+                               href="{{ url_for('manage_courses') }}">
+                                <i class="fas fa-book"></i>Manage Courses
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Student Only Sections -->
+                        {% if session.get('user_role') == 'student' %}
+                        <!-- Student Academic -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">My Academic</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'attendance' %}active{% endif %}" 
+                               href="{{ url_for('attendance') }}">
+                                <i class="fas fa-calendar-check"></i>My Attendance
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'attendance_report' %}active{% endif %}" 
+                               href="{{ url_for('attendance_report') }}">
+                                <i class="fas fa-chart-line"></i>Attendance Report
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'student_results' %}active{% endif %}" 
+                               href="{{ url_for('student_results') }}">
+                                <i class="fas fa-trophy"></i>My Results
+                            </a>
+                        </li>
+                        {% endif %}
+
+                        <!-- Communication Section - Available for all roles -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">Communication</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint in ['messages', 'read_message'] %}active{% endif %}" 
+                               href="{{ url_for('messages') }}">
+                                <i class="fas fa-envelope"></i>Messages
+                                {% if unread_messages_count > 0 %}
+                                    <span class="badge bg-danger">{{ unread_messages_count }}</span>
+                                {% endif %}
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint in ['compose_message', 'reply_message'] %}active{% endif %}" 
+                               href="{{ url_for('compose_message') }}">
+                                <i class="fas fa-edit"></i>
+                                {% if session.get('user_role') == 'student' %}
+                                Contact Teacher/Admin
+                                {% else %}
+                                Compose Message
+                                {% endif %}
+                            </a>
+                        </li>
+                        
+                        <!-- Logout -->
+                        <li class="nav-item logout-section">
+                            <a class="nav-link text-danger" href="{{ url_for('logout') }}">
+                                <i class="fas fa-sign-out-alt"></i>Logout
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        {% endif %}
+
+        <!-- Main Content -->
+        <main class="main-content {% if not session.get('user_id') %}no-sidebar{% endif %}">
+            <!-- Flash Messages -->
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="flash-messages">
+                        {% for message in messages %}
+                            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                <i class="fas fa-info-circle me-2"></i>{{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+
+            <!-- Page Content -->
+            <div class="content-wrapper fade-in">
+                {% block main %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+<style>
+/* Enhanced CSS for better layout and styling */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    line-height: 1.6;
+}
+
+/* Header Styles */
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 2rem;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+/* Main Layout */
+.main-layout {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 80px;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 280px;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    left: 0;
+    top: 80px;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 999;
+}
+
+.sidebar-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+/* User Info */
+.user-info {
+    padding: 2rem 1.5rem;
+    text-align: center;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 1px solid #dee2e6;
+}
+
+.user-avatar {
+    margin-bottom: 1rem;
+}
+
+.user-avatar i {
+    font-size: 3rem;
+    color: #6c757d;
+}
+
+.user-info h6 {
+    margin: 0.5rem 0 0.25rem 0;
+    font-weight: 600;
+    color: #495057;
+}
+
+.user-info small {
+    color: #6c757d;
+    text-transform: uppercase;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+}
+
+/* Navigation */
+.sidebar-nav {
+    flex: 1;
+    padding: 1rem 0;
+}
+
+.nav-section-header {
+    display: block;
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #6c757d;
+    letter-spacing: 0.5px;
+    border-top: 1px solid #f1f3f4;
+    margin-top: 0.5rem;
+}
+
+.nav-section-header:first-child {
+    border-top: none;
+    margin-top: 0;
+}
+
+.nav-item {
+    margin: 0;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    color: #495057;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    border-left: 3px solid transparent;
+    position: relative;
+}
+
+.nav-link:hover {
+    background-color: #f8f9fa;
+    color: #007bff;
+    text-decoration: none;
+}
+
+.nav-link.active {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border-left-color: #1976d2;
+    font-weight: 600;
+}
+
+.nav-link i {
+    width: 20px;
+    margin-right: 0.75rem;
+    text-align: center;
+}
+
+.nav-link .badge {
+    margin-left: auto;
+    font-size: 0.7rem;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.logout-section {
+    margin-top: auto;
+    border-top: 1px solid #dee2e6;
+    padding-top: 1rem;
+}
+
+.logout-section .nav-link:hover {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: 280px;
+    padding: 2rem;
+    min-height: calc(100vh - 80px);
+}
+
+.main-content.no-sidebar {
+    margin-left: 0;
+}
+
+.content-wrapper {
+    max-width: 100%;
+}
+
+/* Flash Messages */
+.flash-messages {
+    margin-bottom: 2rem;
+}
+
+.flash-messages .alert {
+    border: none;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Animations */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.show {
+        transform: translateX(0);
+    }
+    
+    .main-content {
+        margin-left: 0;
+        padding: 1rem;
+    }
+    
+    .header {
+        padding: 1rem;
+    }
+    
+    .header h1 {
+        font-size: 1.25rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .user-info {
+        padding: 1.5rem 1rem;
+    }
+    
+    .nav-link {
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+    
+    .nav-section-header {
+        padding: 0.75rem 1rem 0.25rem;
+        font-size: 0.7rem;
+    }
+}
+
+/* Scrollbar Styling */
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Print Styles */
+@media print {
+    .sidebar,
+    .header {
+        display: none !important;
+    }
+    
+    .main-content {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+}
+</style>

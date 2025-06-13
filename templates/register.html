@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - Institute Management System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card" style="max-width: 500px;">
+            <div class="auth-header">
+                <h3 class="mb-0">
+                    <i class="fas fa-user-plus me-2"></i>
+                    {{ role.title() }} Registration
+                </h3>
+                <p class="mt-2 mb-0 opacity-75">Create your account to get started</p>
+            </div>
+            <div class="auth-body">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-danger" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST">
+                    <input type="hidden" name="role" value="{{ role }}">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="first_name" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="first_name" name="first_name" 
+                                   placeholder="Enter first name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="last_name" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="last_name" name="last_name" 
+                                   placeholder="Enter last name" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-envelope"></i>
+                            </span>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   placeholder="Enter your email" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone Number</label>
+                        <div class="input-group">
+                            <span class="input-group-text">
+                                <i class="fas fa-phone"></i>
+                            </span>
+                            <input type="tel" class="form-control" id="phone" name="phone" 
+                                   placeholder="Enter phone number" required>
+                        </div>
+                    </div>
+
+                    {% if role == 'student' %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="course" class="form-label">Course</label>
+                            <select class="form-select" id="course" name="course" required>
+                                <option value="">Select Course</option>
+                                {% for course in courses %}
+                                    <option value="{{ course.course_name }}">{{ course.course_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="dob" class="form-label">Date of Birth</label>
+                            <input type="date" class="form-control" id="dob" name="dob" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="gender" class="form-label">Gender</label>
+                        <select class="form-select" id="gender" name="gender" required>
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <h6 class="text-primary border-bottom pb-2">
+                                <i class="fas fa-users me-2"></i>Parent/Guardian Information
+                            </h6>
+                        </div>
+                    </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="parent_name" class="form-label">Parent/Guardian Name *</label>
+                                <input type="text" class="form-control" id="parent_name" name="parent_name" 
+                                    placeholder="Full name of parent/guardian" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="parent_phone" class="form-label">Parent Contact Number *</label>
+                                <input type="tel" class="form-control" id="parent_phone" name="parent_phone" 
+                                    placeholder="Parent's phone number" required>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="parent_email" class="form-label">Parent Email</label>
+                                <input type="email" class="form-control" id="parent_email" name="parent_email" 
+                                    placeholder="Parent's email address">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="parent_occupation" class="form-label">Parent Occupation</label>
+                                <input type="text" class="form-control" id="parent_occupation" name="parent_occupation" 
+                                    placeholder="Parent's occupation">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="emergency_contact" class="form-label">Emergency Contact</label>
+                            <input type="text" class="form-control" id="emergency_contact" name="emergency_contact" 
+                                placeholder="Alternative emergency contact number">
+                        </div>
+                    {% endif %}
+
+                    {% if role == 'teacher' %}
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">Subject/Specialization</label>
+                        <input type="text" class="form-control" id="subject" name="subject" 
+                               placeholder="e.g., Computer Science, Mathematics" required>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control" id="password" name="password" 
+                                       placeholder="Enter password" required minlength="6">
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="confirm_password" class="form-label">Confirm Password</label>
+                            <div class="input-group">
+                                <span class="input-group-text">
+                                    <i class="fas fa-lock"></i>
+                                </span>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password" 
+                                       placeholder="Confirm password" required minlength="6">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100 mb-3">
+                        <i class="fas fa-user-plus me-2"></i>Create Account
+                    </button>
+                </form>
+                
+                <div class="text-center">
+                    <p class="mb-2">Already have an account?</p>
+                    <a href="{{ url_for('login', role=role) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i>Sign In
+                    </a>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('start') }}" class="text-muted">
+                        <i class="fas fa-arrow-left me-1"></i>Back to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
+<style>
+.input-group-text {
+    background: var(--purple-light);
+    border: 2px solid var(--border-color);
+    border-right: none;
+    color: var(--purple-primary);
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus {
+    border-color: var(--purple-primary);
+    border-left: none;
+}
+
+.input-group-text + .form-control:focus {
+    border-left: 2px solid var(--purple-primary);
+}
+</style>

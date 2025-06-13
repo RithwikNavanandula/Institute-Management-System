@@ -1,0 +1,163 @@
+{% extends "layout.html" %}
+
+{% block title %}My Results{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <!-- Student Info Card -->
+        <div class="welcome-section mb-4">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h3 class="mb-2">
+                        <i class="fas fa-trophy me-2"></i>Academic Results
+                    </h3>
+                    <p class="mb-1"><strong>Student:</strong> {{ student_info.name }}</p>
+                    <p class="mb-0"><strong>Course:</strong> {{ student_info.course }}</p>
+                </div>
+                <div class="text-end">
+                    <i class="fas fa-user-graduate fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+
+        {% if course_results %}
+        <!-- Results Accordion -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Course-wise Results
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="accordion" id="resultsAccordion">
+                    {% for course_name, data in course_data.items() %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ loop.index }}">
+                            <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" 
+                                    type="button" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#collapse{{ loop.index }}" 
+                                    aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" 
+                                    aria-controls="collapse{{ loop.index }}">
+                                <div class="d-flex justify-content-between align-items-center w-100 me-3">
+                                    <div>
+                                        <strong>{{ course_name }}</strong>
+                                    </div>
+                                    <div class="d-flex gap-3">
+                                        <span class="badge bg-primary">
+                                            Grade: {{ data.result.final_grade or 'N/A' }}
+                                        </span>
+                                        <span class="badge bg-{% if data.result.status == 'Pass' %}success{% elif data.result.status == 'Fail' %}danger{% else %}secondary{% endif %}">
+                                            {{ data.result.status }}
+                                        </span>
+                                        {% if data.result.final_percentage %}
+                                        <span class="badge bg-info">
+                                            {{ "%.1f"|format(data.result.final_percentage) }}%
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ loop.index }}" 
+                             class="accordion-collapse collapse {% if loop.first %}show{% endif %}" 
+                             aria-labelledby="heading{{ loop.index }}" 
+                             data-bs-parent="#resultsAccordion">
+                            <div class="accordion-body">
+                                {% if data.assessments %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Assessment</th>
+                                                <th>Type</th>
+                                                <th>Date</th>
+                                                <th>Total Marks</th>
+                                                <th>Obtained</th>
+                                                <th>Percentage</th>
+                                                <th>Weightage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for assessment in data.assessments %}
+                                            <tr>
+                                                <td>
+                                                    <strong>{{ assessment.assessment_name }}</strong>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ assessment.assessment_type }}</span>
+                                                </td>
+                                                <td>{{ assessment.assessment_date }}</td>
+                                                <td>{{ assessment.total_marks }}</td>
+                                                <td>{{ assessment.obtained_marks }}</td>
+                                                <td>
+                                                    <span class="badge bg-{% if assessment.percentage >= 90 %}success{% elif assessment.percentage >= 70 %}warning{% elif assessment.percentage >= 50 %}info{% else %}danger{% endif %}">
+                                                        {{ "%.1f"|format(assessment.percentage) }}%
+                                                    </span>
+                                                </td>
+                                                <td>{{ assessment.weightage }}%</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                
+                                <!-- Course Summary -->
+                                <div class="row mt-3">
+                                    <div class="col-md-3">
+                                        <div class="stats-card text-center">
+                                            <div class="stats-number">{{ data.result.final_grade or 'N/A' }}</div>
+                                            <div class="stats-label">Final Grade</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card text-center">
+                                            <div class="stats-number">
+                                                {% if data.result.final_percentage %}
+                                                    {{ "%.1f"|format(data.result.final_percentage) }}%
+                                                {% else %}
+                                                    N/A
+                                                {% endif %}
+                                            </div>
+                                            <div class="stats-label">Final Percentage</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card text-center">
+                                            <div class="stats-number">{{ data.assessments|length }}</div>
+                                            <div class="stats-label">Assessments</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="stats-card text-center">
+                                            <div class="stats-number">{{ data.result.status or 'N/A' }}</div>
+                                            <div class="stats-label">Status</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-clipboard-list fa-2x text-muted mb-2"></i>
+                                    <p class="text-muted">No assessments found for this course</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No results available</h5>
+                <p class="text-muted">Your assessment results will appear here once teachers have graded your work.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

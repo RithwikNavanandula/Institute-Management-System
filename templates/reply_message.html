@@ -1,0 +1,63 @@
+{% extends "layout.html" %}
+
+{% block title %}Reply Message{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-reply me-2"></i>Reply to Message
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Original Message -->
+                <div class="original-message mb-4">
+                    <h6>Original Message:</h6>
+                    <div class="card bg-light">
+                        <div class="card-header py-2">
+                            <small>
+                                <strong>From:</strong> {{ original_message.sender_name }} ({{ original_message.sender_role.title() }})<br>
+                                <strong>Subject:</strong> {{ original_message.subject }}<br>
+                                <strong>Date:</strong> {{ original_message.sent_at }}
+                            </small>
+                        </div>
+                        <div class="card-body py-2">
+                            <small>{{ original_message.message_body }}</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Reply Form -->
+                <form method="POST" action="{{ url_for('send_reply') }}">
+                    <input type="hidden" name="original_message_id" value="{{ original_message.message_id }}">
+                    <input type="hidden" name="recipient_id" value="{{ original_message.sender_id }}">
+                    <input type="hidden" name="recipient_role" value="{{ original_message.sender_role }}">
+                    
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">Subject:</label>
+                        <input type="text" class="form-control" id="subject" name="subject" 
+                               value="Re: {{ original_message.subject }}" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="message_body" class="form-label">Your Reply:</label>
+                        <textarea class="form-control" id="message_body" name="message_body" 
+                                  rows="6" placeholder="Type your reply here..." required></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('messages') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Messages
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-reply me-1"></i>Send Reply
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

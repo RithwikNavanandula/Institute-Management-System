@@ -1,0 +1,140 @@
+{% extends "layout.html" %}
+
+{% block title %}Grade Report{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Grade Report
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Filters -->
+                <form method="GET" class="row g-3 mb-4">
+                    {% if user_role in ['admin', 'teacher'] %}
+                    <div class="col-md-3">
+                        <select class="form-select" name="course">
+                            <option value="">All Courses</option>
+                            {% for course in courses %}
+                                <option value="{{ course.course_name }}" 
+                                    {% if course.course_name == filters.course %}selected{% endif %}>
+                                    {{ course.course_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" name="student">
+                            <option value="">All Students</option>
+                            {% for student in students %}
+                                <option value="{{ student.student_id }}" 
+                                    {% if student.student_id|string == filters.student %}selected{% endif %}>
+                                    {{ student.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" name="start_date" 
+                               value="{{ filters.start_date }}" placeholder="From Date">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" name="end_date" 
+                               value="{{ filters.end_date }}" placeholder="To Date">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter me-1"></i>Apply Filters
+                        </button>
+                        <a href="{{ url_for('grade_report') }}" class="btn btn-secondary">
+                            <i class="fas fa-sync me-1"></i>Reset
+                        </a>
+                    </div>
+                </form>
+
+                <!-- Grade Statistics -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <h5>Average Marks</h5>
+                                <h3>
+                                    {{ (grades | sum(attribute='marks') / grades|length) | round(2) if grades else 0 }}
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-success text-white">
+                            <div class="card-body text-center">
+                                <h5>Highest Grade</h5>
+                                <h3>{{ grades | max(attribute='grade')['grade'] if grades else '-' }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-warning text-dark">
+                            <div class="card-body text-center">
+                                <h5>Lowest Grade</h5>
+                                <h3>{{ grades | min(attribute='grade')['grade'] if grades else '-' }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card bg-info text-white">
+                            <div class="card-body text-center">
+                                <h5>Total Records</h5>
+                                <h3>{{ grades | length }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grade Table -->
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Student</th>
+                                <th>Course</th>
+                                <th>Marks</th>
+                                <th>Grade</th>
+                                <th>Date</th>
+                                <th>Teacher</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for grade in grades %}
+                            <tr>
+                                <td>{{ grade.student_name or grade.student_id }}</td>
+                                <td>{{ grade.course_name }}</td>
+                                <td>{{ grade.marks }}</td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if grade.grade in ['A','B'] else 'warning' if grade.grade in ['C','D'] else 'danger' }}">
+                                        {{ grade.grade }}
+                                    </span>
+                                </td>
+                                <td>{{ grade.grade_date }}</td>
+                                <td>{{ grade.teacher_name }}</td>
+                                <td>{{ grade.remarks or '' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    No grades found matching your criteria
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

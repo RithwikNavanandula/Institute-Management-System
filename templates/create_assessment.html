@@ -1,0 +1,78 @@
+{% extends "layout.html" %}
+
+{% block title %}Create Assessment{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-plus-circle me-2"></i>Create New Assessment
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Course *</label>
+                            <select class="form-select" name="course_name" required>
+                                <option value="">Select Course</option>
+                                {% for course in courses %}
+                                    <option value="{{ course.course_name }}">{{ course.course_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Assessment Type *</label>
+                            <select class="form-select" name="assessment_type" required>
+                                <option value="">Select Type</option>
+                                {% for type in assessment_types %}
+                                    <option value="{{ type }}">{{ type }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Assessment Name *</label>
+                        <input type="text" class="form-control" name="assessment_name" 
+                               placeholder="e.g., Chapter 1 Quiz, Midterm Exam" required>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Total Marks *</label>
+                            <input type="number" class="form-control" name="total_marks" 
+                                   min="1" max="1000" placeholder="e.g., 50, 100, 200" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Weightage (%) *</label>
+                            <input type="number" class="form-control" name="weightage" 
+                                   min="0.1" max="100" step="0.1" placeholder="e.g., 15, 25, 40" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Assessment Date *</label>
+                            <input type="date" class="form-control" name="assessment_date" 
+                                   value="{{ current_date }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" 
+                                  placeholder="Optional description about the assessment"></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ url_for('assessments') }}" class="btn btn-secondary">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Create Assessment
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

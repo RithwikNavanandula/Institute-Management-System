@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+
+{% block title %}Compose Message{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-edit me-2"></i>Compose New Message
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('send_message') }}">
+                    <div class="mb-3">
+                        <label for="recipient" class="form-label">To:</label>
+                        <select class="form-select" id="recipient" name="recipient" required>
+                            <option value="">Select recipient...</option>
+                            {% for recipient in recipients %}
+                            <option value="{{ recipient.id }}|{{ recipient.role }}">
+                                {{ recipient.name }} ({{ recipient.role.title() }})
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="subject" class="form-label">Subject:</label>
+                        <input type="text" class="form-control" id="subject" name="subject" 
+                               placeholder="Enter message subject" required>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="message_body" class="form-label">Message:</label>
+                        <textarea class="form-control" id="message_body" name="message_body" 
+                                  rows="8" placeholder="Type your message here..." required></textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('messages') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Messages
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-1"></i>Send Message
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

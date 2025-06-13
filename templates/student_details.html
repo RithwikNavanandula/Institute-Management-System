@@ -1,0 +1,308 @@
+{% extends "layout.html" %}
+
+{% block title %}Student Details - {{ student.name }}{% endblock %}
+
+{% block main %}
+<!-- Student Profile Header -->
+<div class="welcome-section mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <div>
+            <h3 class="mb-2">
+                <i class="fas fa-user-graduate me-2"></i>{{ student.name }}
+            </h3>
+            <p class="mb-1"><strong>Student ID:</strong> {{ student.student_id }}</p>
+            <p class="mb-0"><strong>Email:</strong> {{ student.email }}</p>
+        </div>
+        <div class="text-end">
+            <span class="badge bg-{% if student.status == 1 %}success{% else %}warning{% endif %} fs-6">
+                {{ 'Active' if student.status == 1 else 'Pending' }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Student Statistics -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-success">{{ stats.attendance_percentage }}%</div>
+            <div class="stats-label">Attendance Rate</div>
+            <i class="fas fa-calendar-check fa-2x stats-icon text-success"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-primary">{{ stats.overall_avg }}%</div>
+            <div class="stats-label">Overall Average</div>
+            <i class="fas fa-chart-line fa-2x stats-icon text-primary"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-info">{{ stats.total_courses }}</div>
+            <div class="stats-label">Enrolled Courses</div>
+            <i class="fas fa-book fa-2x stats-icon text-info"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-warning">{{ stats.total_assessments }}</div>
+            <div class="stats-label">Assessments Taken</div>
+            <i class="fas fa-tasks fa-2x stats-icon text-warning"></i>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Personal Information -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-user me-2"></i>Personal Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Full Name:</strong><br>
+                    {{ student.name }}
+                </div>
+                <div class="mb-3">
+                    <strong>Email:</strong><br>
+                    {{ student.email }}
+                </div>
+                <div class="mb-3">
+                    <strong>Phone:</strong><br>
+                    {{ student.phone }}
+                </div>
+                <div class="mb-3">
+                    <strong>Course:</strong><br>
+                    <span class="badge bg-info">{{ student.course }}</span>
+                </div>
+                <div class="mb-3">
+                    <strong>Date of Birth:</strong><br>
+                    {{ student.dob }}
+                </div>
+                <div class="mb-3">
+                    <strong>Gender:</strong><br>
+                    {{ student.gender }}
+                </div>
+                <div class="mb-0">
+                    <strong>Account Status:</strong><br>
+                    <span class="badge bg-{% if student.status == 1 %}success{% else %}warning{% endif %}">
+                        {{ 'Active' if student.status == 1 else 'Pending Approval' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Parent/Guardian Information -->
+    <div class="col-lg-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-users me-2"></i>Parent/Guardian Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>Name:</strong><br>
+                    {{ student.parent_name or 'Not provided' }}
+                </div>
+                <div class="mb-3">
+                    <strong>Phone:</strong><br>
+                    {{ student.parent_phone or 'Not provided' }}
+                </div>
+                <div class="mb-3">
+                    <strong>Email:</strong><br>
+                    {{ student.parent_email or 'Not provided' }}
+                </div>
+                <div class="mb-3">
+                    <strong>Occupation:</strong><br>
+                    {{ student.parent_occupation or 'Not provided' }}
+                </div>
+                <div class="mb-0">
+                    <strong>Emergency Contact:</strong><br>
+                    {{ student.emergency_contact or 'Not provided' }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Course Results -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-trophy me-2"></i>Course Results
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if course_results %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Course</th>
+                                <th>Final Percentage</th>
+                                <th>Grade</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in course_results %}
+                            <tr>
+                                <td>
+                                    <strong>{{ result.course_name }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if result.final_percentage >= 80 %}success{% elif result.final_percentage >= 60 %}warning{% else %}danger{% endif %}">
+                                        {{ "%.1f"|format(result.final_percentage) }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ result.final_grade }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if result.status == 'Pass' %}success{% else %}danger{% endif %}">
+                                        {{ result.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-chart-line fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No course results available yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Attendance -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-calendar-alt me-2"></i>Recent Attendance (Last 20 records)
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if attendance_data %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Course</th>
+                                <th>Status</th>
+                                <th>Marked By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in attendance_data %}
+                            <tr>
+                                <td>{{ record.date }}</td>
+                                <td>
+                                    <span class="badge bg-info">{{ record.course_name }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{% if record.status == 'present' %}success{% else %}danger{% endif %}">
+                                        <i class="fas fa-{% if record.status == 'present' %}check{% else %}times{% endif %} me-1"></i>
+                                        {{ record.status.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ record.marked_by_name }} 
+                                    <small class="text-muted">({{ record.marked_by_role.title() }})</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-calendar-times fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No attendance records found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Assessments -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tasks me-2"></i>Assessment Performance
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if assessment_details %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Assessment</th>
+                                <th>Course</th>
+                                <th>Date</th>
+                                <th>Marks</th>
+                                <th>Percentage</th>
+                                <th>Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assessment in assessment_details %}
+                            <tr>
+                                <td>
+                                    <strong>{{ assessment.assessment_name }}</strong><br>
+                                    <small class="text-muted">{{ assessment.assessment_type }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ assessment.course_name }}</span>
+                                </td>
+                                <td>{{ assessment.assessment_date }}</td>
+                                <td>{{ assessment.obtained_marks }}/{{ assessment.total_marks }}</td>
+                                <td>
+                                    <span class="badge bg-{% if assessment.percentage >= 80 %}success{% elif assessment.percentage >= 60 %}warning{% else %}danger{% endif %}">
+                                        {{ "%.1f"|format(assessment.percentage) }}%
+                                    </span>
+                                </td>
+                                <td>
+                                    <small>{{ assessment.remarks or '-' }}</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="fas fa-clipboard-list fa-2x text-muted mb-2"></i>
+                    <p class="text-muted">No assessment records found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="{{ url_for('manage_students') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left me-1"></i>Back to Manage Students
+    </a>
+</div>
+{% endblock %}

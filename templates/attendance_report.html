@@ -1,0 +1,113 @@
+{% extends "layout.html" %}
+
+{% block title %}Attendance Report{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Attendance Report
+                </h4>
+                <form method="get" class="d-flex gap-2">
+                    <input type="date" name="start_date" class="form-control" 
+                           value="{{ start_date }}" placeholder="Start Date">
+                    <input type="date" name="end_date" class="form-control" 
+                           value="{{ end_date }}" placeholder="End Date">
+                    <select name="course" class="form-select">
+                        <option value="">All Courses</option>
+                        {% for course in courses %}
+                        <option value="{{ course.course_name }}" 
+                                {% if course.course_name == course_filter %}selected{% endif %}>
+                            {{ course.course_name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <select name="student" class="form-select">
+                        <option value="">All Students</option>
+                        {% for student in students %}
+                        <option value="{{ student.student_id }}" 
+                                {% if student.student_id|string == student_filter|string %}selected{% endif %}>
+                            {{ student.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-search me-1"></i>Filter
+                    </button>
+                </form>
+            </div>
+            <div class="card-body">
+                {% if attendance_data %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th><i class="fas fa-calendar me-1"></i>Date</th>
+                                <th><i class="fas fa-user me-1"></i>Student Name</th>
+                                <th><i class="fas fa-book me-1"></i>Course</th>
+                                <th><i class="fas fa-check-circle me-1"></i>Status</th>
+                                <th><i class="fas fa-user-check me-1"></i>Marked By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in attendance_data %}
+                            <tr>
+                                <td>{{ record.date }}</td>
+                                <td>
+                                    <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
+                                    {{ record.student_name }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ record.course_name }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'success' if record.status == 'present' else 'danger' }}">
+                                        <i class="fas fa-{{ 'check' if record.status == 'present' else 'times' }} me-1"></i>
+                                        {{ record.status.title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {{ record.marked_by_name }} 
+                                    <small class="text-muted">({{ record.marked_by_role.title() }})</small>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Attendance Summary -->
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="stats-card">
+                            <div class="stats-number text-success">
+                                {{ attendance_data | selectattr('status', 'equalto', 'present') | list | length }}
+                            </div>
+                            <div class="stats-label">Total Present</div>
+                            <i class="fas fa-check-circle fa-2x stats-icon text-success"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="stats-card">
+                            <div class="stats-number text-danger">
+                                {{ attendance_data | selectattr('status', 'equalto', 'absent') | list | length }}
+                            </div>
+                            <div class="stats-label">Total Absent</div>
+                            <i class="fas fa-times-circle fa-2x stats-icon text-danger"></i>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No attendance records found</h5>
+                    <p class="text-muted">Try adjusting your filter criteria to view attendance data.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

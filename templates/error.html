@@ -1,0 +1,189 @@
+{% extends "layout.html" %}
+
+{% block title %}{{ error_code }} - {{ error_message }}{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card border-0 shadow">
+            <div class="card-body text-center py-5">
+                <!-- Error Icon -->
+                <div class="error-icon mb-4">
+                    {% if error_code == 404 %}
+                        <i class="fas fa-search fa-4x text-warning"></i>
+                    {% elif error_code == 403 %}
+                        <i class="fas fa-ban fa-4x text-danger"></i>
+                    {% elif error_code == 500 %}
+                        <i class="fas fa-exclamation-triangle fa-4x text-danger"></i>
+                    {% elif error_code == 401 %}
+                        <i class="fas fa-lock fa-4x text-warning"></i>
+                    {% else %}
+                        <i class="fas fa-exclamation-circle fa-4x text-muted"></i>
+                    {% endif %}
+                </div>
+
+                <!-- Error Code -->
+                <h1 class="display-1 fw-bold text-muted mb-3">{{ error_code }}</h1>
+
+                <!-- Error Message -->
+                <h2 class="h4 mb-3">{{ error_title }}</h2>
+                <p class="text-muted mb-4">{{ error_message }}</p>
+
+                <!-- Helpful Actions -->
+                <div class="d-flex flex-column flex-md-row gap-3 justify-content-center">
+                    {% if session.get('user_id') %}
+                        <!-- User is logged in -->
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-primary">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                        
+                        {% if error_code == 403 %}
+                            <a href="javascript:history.back()" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Go Back
+                            </a>
+                        {% endif %}
+                        
+                        {% if error_code == 404 %}
+                            {% if session.get('user_role') in ['admin', 'teacher'] %}
+                                <a href="{{ url_for('manage_students') }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-users me-2"></i>Manage Students
+                                </a>
+                            {% endif %}
+                            
+                            <a href="{{ url_for('messages') }}" class="btn btn-outline-secondary">
+                                <i class="fas fa-envelope me-2"></i>Messages
+                            </a>
+                        {% endif %}
+                    {% else %}
+                        <!-- User is not logged in -->
+                        <a href="{{ url_for('start') }}" class="btn btn-primary">
+                            <i class="fas fa-home me-2"></i>Go to Home
+                        </a>
+                        <a href="{{ url_for('login') }}" class="btn btn-outline-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>Login
+                        </a>
+                    {% endif %}
+                </div>
+
+                <!-- Additional Help Section -->
+                <div class="mt-5 pt-4 border-top">
+                    <h6 class="text-muted mb-3">Need Help?</h6>
+                    <div class="row g-3">
+                        {% if session.get('user_id') %}
+                            {% if session.get('user_role') == 'student' %}
+                                <div class="col-md-6">
+                                    <div class="help-card p-3 bg-light rounded">
+                                        <i class="fas fa-envelope fa-2x text-primary mb-2"></i>
+                                        <h6>Contact Teacher/Admin</h6>
+                                        <small class="text-muted">Send a message for assistance</small>
+                                        <br>
+                                        <a href="{{ url_for('compose_message') }}" class="btn btn-sm btn-outline-primary mt-2">
+                                            Contact Now
+                                        </a>
+                                    </div>
+                                </div>
+                            {% elif session.get('user_role') in ['admin', 'teacher'] %}
+                                <div class="col-md-6">
+                                    <div class="help-card p-3 bg-light rounded">
+                                        <i class="fas fa-users fa-2x text-success mb-2"></i>
+                                        <h6>User Management</h6>
+                                        <small class="text-muted">Check pending accounts or manage users</small>
+                                        <br>
+                                        <a href="{{ url_for('pending_accounts') }}" class="btn btn-sm btn-outline-success mt-2">
+                                            View Accounts
+                                        </a>
+                                    </div>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="col-md-6">
+                                <div class="help-card p-3 bg-light rounded">
+                                    <i class="fas fa-chart-bar fa-2x text-info mb-2"></i>
+                                    <h6>System Overview</h6>
+                                    <small class="text-muted">View your dashboard and recent activities</small>
+                                    <br>
+                                    <a href="{{ url_for('dashboard') }}" class="btn btn-sm btn-outline-info mt-2">
+                                        View Dashboard
+                                    </a>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="col-md-6">
+                                <div class="help-card p-3 bg-light rounded">
+                                    <i class="fas fa-user-plus fa-2x text-primary mb-2"></i>
+                                    <h6>New User?</h6>
+                                    <small class="text-muted">Register for an account</small>
+                                    <br>
+                                    <a href="{{ url_for('register') }}" class="btn btn-sm btn-outline-primary mt-2">
+                                        Register Now
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="help-card p-3 bg-light rounded">
+                                    <i class="fas fa-info-circle fa-2x text-secondary mb-2"></i>
+                                    <h6>Learn More</h6>
+                                    <small class="text-muted">About our institute management system</small>
+                                    <br>
+                                    <a href="{{ url_for('start') }}" class="btn btn-sm btn-outline-secondary mt-2">
+                                        Learn More
+                                    </a>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Error Details (only show in debug mode) -->
+                {% if config.DEBUG and error_details %}
+                <div class="mt-4 pt-3 border-top">
+                    <details class="text-start">
+                        <summary class="text-muted small">Technical Details (Debug Mode)</summary>
+                        <pre class="bg-light p-3 rounded mt-2 small text-danger">{{ error_details }}</pre>
+                    </details>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.help-card {
+    transition: all 0.3s ease;
+    text-align: center;
+    height: 100%;
+}
+
+.help-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.error-icon {
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+@media (max-width: 768px) {
+    .display-1 {
+        font-size: 3rem;
+    }
+    
+    .help-card {
+        margin-bottom: 1rem;
+    }
+}
+</style>
+{% endblock %}

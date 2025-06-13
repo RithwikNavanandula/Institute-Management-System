@@ -1,0 +1,287 @@
+{% extends "layout.html" %}
+
+{% block title %}Pending Accounts{% endblock %}
+
+{% block main %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-check me-2"></i>Pending Account Approvals
+                </h4>
+                <p class="mt-2 mb-0 text-muted">Review and approve new registrations</p>
+            </div>
+            <div class="card-body">
+                {% if user_role == 'admin' %}
+                <!-- Students Section -->
+                <div class="mb-5">
+                    <h5 class="d-flex align-items-center mb-3">
+                        <i class="fas fa-user-graduate me-2 text-primary"></i>
+                        Students 
+                        {% if pending_students %}
+                            <span class="badge bg-primary ms-2">{{ pending_students|length }}</span>
+                        {% endif %}
+                    </h5>
+                    {% if pending_students %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Course</th>
+                                    <th>Date of Birth</th>
+                                    <th>Gender</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in pending_students %}
+                                <tr>
+                                    <!-- For Students Section - update the actions column -->
+                                    <td>
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <a href="{{ url_for('student_details', student_id=student.student_id) }}" 
+                                            class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>
+                                            <form method="post" action="{{ url_for('approve_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                                    <i class="fas fa-check me-1"></i>Approve
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{{ url_for('reject_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <i class="fas fa-times me-1"></i>Reject
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
+                                        <strong>{{ student.name }}</strong>
+                                    </td>
+                                    <td>{{ student.email }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ student.course }}</span>
+                                    </td>
+                                    <td>{{ student.dob }}</td>
+                                    <td>{{ student.gender }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('approve_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-success btn-sm me-1">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('reject_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No pending student accounts.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Teachers Section -->
+                <div class="mb-5">
+                    <h5 class="d-flex align-items-center mb-3">
+                        <i class="fas fa-chalkboard-teacher me-2 text-success"></i>
+                        Teachers 
+                        {% if pending_teachers %}
+                            <span class="badge bg-success ms-2">{{ pending_teachers|length }}</span>
+                        {% endif %}
+                    </h5>
+                    {% if pending_teachers %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Subject</th>
+                                    <th>Phone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for teacher in pending_teachers %}
+                                <tr>
+                                    <td>
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <a href="{{ url_for('teacher_details', teacher_id=teacher.teacher_id) }}" 
+                                            class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>
+                                            <form method="post" action="{{ url_for('approve_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-success btn-sm w-100">
+                                                    <i class="fas fa-check me-1"></i>Approve
+                                                </button>
+                                            </form>
+                                            <form method="post" action="{{ url_for('reject_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
+                                                <button type="submit" class="btn btn-danger btn-sm w-100">
+                                                    <i class="fas fa-times me-1"></i>Reject
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <i class="fas fa-user-tie fa-lg text-success me-2"></i>
+                                        <strong>{{ teacher.name }}</strong>
+                                    </td>
+                                    <td>{{ teacher.email }}</td>
+                                    <td>
+                                        <span class="badge bg-warning">{{ teacher.subject }}</span>
+                                    </td>
+                                    <td>{{ teacher.phone }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('approve_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-success btn-sm me-1">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('reject_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No pending teacher accounts.
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Admins Section -->
+                <div class="mb-4">
+                    <h5 class="d-flex align-items-center mb-3">
+                        <i class="fas fa-user-shield me-2 text-danger"></i>
+                        Administrators 
+                        {% if pending_admins %}
+                            <span class="badge bg-danger ms-2">{{ pending_admins|length }}</span>
+                        {% endif %}
+                    </h5>
+                    {% if pending_admins %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for admin in pending_admins %}
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-user-shield fa-lg text-danger me-2"></i>
+                                        <strong>{{ admin.name }}</strong>
+                                    </td>
+                                    <td>{{ admin.email }}</td>
+                                    <td>{{ admin.phone }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('approve_account', role='admin', account_id=admin.admin_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-success btn-sm me-1">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('reject_account', role='admin', account_id=admin.admin_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No pending admin accounts.
+                    </div>
+                    {% endif %}
+                </div>
+
+                {% elif user_role == 'teacher' %}
+                <!-- Teachers can only approve students -->
+                <div class="mb-4">
+                    <h5 class="d-flex align-items-center mb-3">
+                        <i class="fas fa-user-graduate me-2 text-primary"></i>
+                        Students Pending Approval
+                        {% if pending_students %}
+                            <span class="badge bg-primary ms-2">{{ pending_students|length }}</span>
+                        {% endif %}
+                    </h5>
+                    {% if pending_students %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Course</th>
+                                    <th>Date of Birth</th>
+                                    <th>Gender</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student in pending_students %}
+                                <tr>
+                                    <td>
+                                        <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
+                                        <strong>{{ student.name }}</strong>
+                                    </td>
+                                    <td>{{ student.email }}</td>
+                                    <td>
+                                        <span class="badge bg-info">{{ student.course }}</span>
+                                    </td>
+                                    <td>{{ student.dob }}</td>
+                                    <td>{{ student.gender }}</td>
+                                    <td>
+                                        <form method="post" action="{{ url_for('approve_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-success btn-sm me-1">
+                                                <i class="fas fa-check me-1"></i>Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{{ url_for('reject_account', role='student', account_id=student.student_id) }}" class="d-inline">
+                                            <button type="submit" class="btn btn-danger btn-sm">
+                                                <i class="fas fa-times me-1"></i>Reject
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>No pending student accounts.
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
