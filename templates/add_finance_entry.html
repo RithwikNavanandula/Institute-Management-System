@@ -1,0 +1,55 @@
+{% extends "layout.html" %}
+
+{% block title %}Add Finance Entry{% endblock %}
+
+{% block main %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h4 class="card-title mb-0">
+                    <i class="fas fa-plus-circle me-2 text-primary"></i>Add Finance Entry
+                </h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" name="date" value="{{ current_date }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Transaction Type <span class="text-danger">*</span></label>
+                            <select class="form-select" name="transaction_type" required>
+                                <option value="">Select Type</option>
+                                <option value="income">Income</option>
+                                <option value="expenditure">Expenditure</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Amount <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">₹</span>
+                                <input type="number" class="form-control" name="amount" step="0.01" min="0.01" placeholder="0.00" required>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description <span class="text-danger">*</span></label>
+                            <textarea class="form-control" name="description" rows="3" placeholder="Enter description of the transaction..." required></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i>Save Entry
+                        </button>
+                        <a href="{{ url_for('finance') }}" class="btn btn-outline-secondary">
+                            <i class="fas fa-times me-1"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

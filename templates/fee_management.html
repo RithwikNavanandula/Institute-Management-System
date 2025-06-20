@@ -1,0 +1,163 @@
+{% extends "layout.html" %}
+
+{% block title %}Fee Management{% endblock %}
+
+{% block main %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2><i class="fas fa-money-bill-wave me-2 text-primary"></i>Fee Management</h2>
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number">{{ total_students }}</div>
+            <div class="stats-label">Total Students</div>
+            <i class="fas fa-users stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number text-success">{{ paid_students }}</div>
+            <div class="stats-label">Fees Paid</div>
+            <i class="fas fa-check-circle stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stats-card">
+            <div class="stats-number text-danger">{{ unpaid_students }}</div>
+            <div class="stats-label">Fees Pending</div>
+            <i class="fas fa-exclamation-circle stats-icon"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="fas fa-filter me-2"></i>Filter Students</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" class="form-control" name="search" value="{{ search_query }}" placeholder="Search by name or email...">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Course</label>
+                <select class="form-select" name="course">
+                    <option value="">All Courses</option>
+                    {% for course in courses %}
+                        <option value="{{ course.course_name }}" {% if course_filter == course.course_name %}selected{% endif %}>
+                            {{ course.course_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Fee Status</label>
+                <select class="form-select" name="status">
+                    <option value="">All Statuses</option>
+                    <option value="paid" {% if status_filter == 'paid' %}selected{% endif %}>Paid</option>
+                    <option value="unpaid" {% if status_filter == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                    <option value="partial" {% if status_filter == 'partial' %}selected{% endif %}>Partial</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-fill">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <a href="{{ url_for('fee_management') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Students List -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="fas fa-users me-2"></i>Students Fee Status</h5>
+    </div>
+    <div class="card-body">
+        {% if students %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Student Name</th>
+                            <th>Email</th>
+                            <th>Course</th>
+                            <th>Phone</th>
+                            <th>Course Fee</th>
+                            <th>Fee Status</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in students %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="user-avatar me-2" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                                            {{ student.name[0].upper() }}
+                                        </div>
+                                        {{ student.name }}
+                                    </div>
+                                </td>
+                                <td>{{ student.email }}</td>
+                                <td>{{ student.course }}</td>
+                                <td>{{ student.phone }}</td>
+                                <td>
+                                    {% if student.course_fee %}
+                                        ₹{{ "{:,.2f}".format(student.course_fee) }}
+                                    {% else %}
+                                        <span class="text-muted">Not Set</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="fee-status {{ student.fee_status }}">
+                                        {% if student.fee_status == 'paid' %}
+                                            <i class="fas fa-check-circle"></i> Paid
+                                        {% elif student.fee_status == 'unpaid' %}
+                                            <i class="fas fa-times-circle"></i> Unpaid
+                                        {% else %}
+                                            <i class="fas fa-minus-circle"></i> Partial
+                                        {% endif %}
+                                    </span>
+                                </td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('update_fee_status', student_id=student.student_id) }}" class="d-inline">
+                                        <div class="d-flex gap-1">
+                                            <select name="fee_status" class="form-select form-select-sm" style="width: auto;">
+                                                <option value="paid" {% if student.fee_status == 'paid' %}selected{% endif %}>Paid</option>
+                                                <option value="unpaid" {% if student.fee_status == 'unpaid' %}selected{% endif %}>Unpaid</option>
+                                                <option value="partial" {% if student.fee_status == 'partial' %}selected{% endif %}>Partial</option>
+                                            </select>
+                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                <i class="fas fa-save"></i>
+                                            </button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No students found</h5>
+                <p class="text-muted">No students match your current filters.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

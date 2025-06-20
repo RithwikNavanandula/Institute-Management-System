@@ -11,19 +11,28 @@
 <body>
     <!-- Header -->
     <div class="header">
-        <h1><i class="fas fa-graduation-cap me-2"></i>Institute Management System</h1>
+        <div class="d-flex align-items-center">
+            <button class="header-toggle me-3" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="{{ url_for('dashboard') }}"><h1 style="color: white;"><i class="fas fa-graduation-cap me-2" style="color: antiquewhite;"></i>Institute Management System</h1>
+            </a>    
+        </div>
     </div>
+
+    <!-- Sidebar Overlay for Mobile -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <!-- Main Layout Container -->
     <div class="main-layout">
         <!-- Sidebar (only show if user is logged in) -->
         {% if session.get('user_id') %}
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-content">
                 <!-- User Info -->
                 <div class="user-info">
                     <div class="user-avatar">
-                        <i class="fas fa-user-circle"></i>
+                        <i class="fas fa-user"></i>
                     </div>
                     <h6>{{ session.get('user_name') }}</h6>
                     <small>{{ session.get('user_role').title() }}</small>
@@ -32,7 +41,7 @@
                 <!-- Navigation Menu -->
                 <nav class="sidebar-nav">
                     <ul class="nav flex-column">
-                        <!-- Dashboard - Common for all roles -->
+                        <!-- Dashboard -->
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" 
                                href="{{ url_for('dashboard') }}">
@@ -42,7 +51,10 @@
                         
                         <!-- Admin and Teacher Sections -->
                         {% if session.get('user_role') in ['admin', 'teacher'] %}
-                        <!-- Account Management -->
+                        <li class="nav-item">
+                            <span class="nav-section-header">Management</span>
+                        </li>
+                        
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'pending_accounts' %}active{% endif %}" 
                                href="{{ url_for('pending_accounts') }}">
@@ -53,9 +65,30 @@
                             </a>
                         </li>
                         
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'fee_management' %}active{% endif %}" 
+                               href="{{ url_for('fee_management') }}">
+                                <i class="fas fa-money-bill-wave"></i>Fee Management
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'finance' %}active{% endif %}" 
+                               href="{{ url_for('finance') }}">
+                                <i class="fas fa-chart-line"></i>Finance Ledger
+                            </a>
+                        </li>
+                        
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_students' %}active{% endif %}" 
+                               href="{{ url_for('manage_students') }}">
+                                <i class="fas fa-users"></i>Manage Students
+                            </a>
+                        </li>
+                        
                         <!-- Attendance Management -->
                         <li class="nav-item">
-                            <span class="nav-section-header">Attendance Management</span>
+                            <span class="nav-section-header">Attendance</span>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'attendance' %}active{% endif %}" 
@@ -72,7 +105,7 @@
 
                         <!-- Assessment & Grading -->
                         <li class="nav-item">
-                            <span class="nav-section-header">Assessment & Grading</span>
+                            <span class="nav-section-header">Assessment</span>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'assessments' %}active{% endif %}" 
@@ -95,20 +128,12 @@
                         
                         <!-- Notifications -->
                         <li class="nav-item">
+                            <span class="nav-section-header">Communication</span>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.endpoint == 'create_notification' %}active{% endif %}" 
                                href="{{ url_for('create_notification') }}">
                                 <i class="fas fa-bell"></i>Create Notification
-                            </a>
-                        </li>
-
-                        <!-- Management Sections -->
-                        <li class="nav-item">
-                            <span class="nav-section-header">Management</span>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint == 'manage_students' %}active{% endif %}" 
-                               href="{{ url_for('manage_students') }}">
-                                <i class="fas fa-users"></i>Manage Students
                             </a>
                         </li>
                         {% endif %}
@@ -127,11 +152,16 @@
                                 <i class="fas fa-book"></i>Manage Courses
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'manage_notifications' %}active{% endif %}" 
+                               href="{{ url_for('manage_notifications') }}">
+                                <i class="fas fa-bell-slash"></i>Manage Notifications
+                            </a>
+                        </li>
                         {% endif %}
 
                         <!-- Student Only Sections -->
                         {% if session.get('user_role') == 'student' %}
-                        <!-- Student Academic -->
                         <li class="nav-item">
                             <span class="nav-section-header">My Academic</span>
                         </li>
@@ -155,34 +185,27 @@
                         </li>
                         {% endif %}
 
-                        <!-- Communication Section - Available for all roles -->
-                        <li class="nav-item">
-                            <span class="nav-section-header">Communication</span>
-                        </li>
+                        <!-- Communication Section -->
                         <li class="nav-item">
                             <a class="nav-link {% if request.endpoint in ['messages', 'read_message'] %}active{% endif %}" 
                                href="{{ url_for('messages') }}">
                                 <i class="fas fa-envelope"></i>Messages
                                 {% if unread_messages_count > 0 %}
-                                    <span class="badge bg-danger">{{ unread_messages_count }}</span>
-                                {% endif %}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {% if request.endpoint in ['compose_message', 'reply_message'] %}active{% endif %}" 
-                               href="{{ url_for('compose_message') }}">
-                                <i class="fas fa-edit"></i>
-                                {% if session.get('user_role') == 'student' %}
-                                Contact Teacher/Admin
-                                {% else %}
-                                Compose Message
+                                    <span class="badge bg-info">{{ unread_messages_count }}</span>
                                 {% endif %}
                             </a>
                         </li>
                         
-                        <!-- Logout -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'compose_message' %}active{% endif %}" 
+                               href="{{ url_for('compose_message') }}">
+                                <i class="fas fa-edit"></i>Compose Message
+                            </a>
+                        </li>
+                        
+                        <!-- Logout Section -->
                         <li class="nav-item logout-section">
-                            <a class="nav-link text-danger" href="{{ url_for('logout') }}">
+                            <a class="nav-link" href="{{ url_for('logout') }}">
                                 <i class="fas fa-sign-out-alt"></i>Logout
                             </a>
                         </li>
@@ -192,314 +215,81 @@
         </aside>
         {% endif %}
 
-        <!-- Main Content -->
+        <!-- Main Content Area -->
         <main class="main-content {% if not session.get('user_id') %}no-sidebar{% endif %}">
-            <!-- Flash Messages -->
-            {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                    <div class="flash-messages">
-                        {% for message in messages %}
-                            <div class="alert alert-info alert-dismissible fade show" role="alert">
-                                <i class="fas fa-info-circle me-2"></i>{{ message }}
-                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% endif %}
-            {% endwith %}
+            <div class="content-wrapper">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                        <div class="flash-messages">
+                            {% for message in messages %}
+                                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
 
-            <!-- Page Content -->
-            <div class="content-wrapper fade-in">
-                {% block main %}{% endblock %}
+                <!-- Page Content -->
+                {% block main %}
+                {% endblock %}
             </div>
         </main>
     </div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Mobile Sidebar Toggle
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarToggle = document.getElementById('sidebarToggle');
+            const sidebar = document.getElementById('sidebar');
+            const sidebarOverlay = document.getElementById('sidebarOverlay');
+            
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', function() {
+                    sidebar.classList.toggle('show');
+                    sidebarOverlay.classList.toggle('show');
+                });
+                
+                sidebarOverlay.addEventListener('click', function() {
+                    sidebar.classList.remove('show');
+                    sidebarOverlay.classList.remove('show');
+                });
+                
+                // Close sidebar when clicking outside on mobile
+                document.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        if (!sidebar.contains(e.target) && !sidebarToggle.contains(e.target)) {
+                            sidebar.classList.remove('show');
+                            sidebarOverlay.classList.remove('show');
+                        }
+                    }
+                });
+                
+                // Handle window resize
+                window.addEventListener('resize', function() {
+                    if (window.innerWidth > 768) {
+                        sidebar.classList.remove('show');
+                        sidebarOverlay.classList.remove('show');
+                    }
+                });
+            }
+        });
+        
+        // Auto dismiss flash messages
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                if (alert.querySelector('.btn-close')) {
+                    alert.querySelector('.btn-close').click();
+                }
+            });
+        }, 5000);
+    </script>
+    
+    {% block scripts %}{% endblock %}
 </body>
 </html>
-
-<style>
-/* Enhanced CSS for better layout and styling */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f8f9fa;
-    line-height: 1.6;
-}
-
-/* Header Styles */
-.header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 1rem 2rem;
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    font-weight: 600;
-}
-
-/* Main Layout */
-.main-layout {
-    display: flex;
-    min-height: 100vh;
-    padding-top: 80px;
-}
-
-/* Sidebar Styles */
-.sidebar {
-    width: 280px;
-    background: white;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
-    position: fixed;
-    left: 0;
-    top: 80px;
-    bottom: 0;
-    overflow-y: auto;
-    z-index: 999;
-}
-
-.sidebar-content {
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-}
-
-/* User Info */
-.user-info {
-    padding: 2rem 1.5rem;
-    text-align: center;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-bottom: 1px solid #dee2e6;
-}
-
-.user-avatar {
-    margin-bottom: 1rem;
-}
-
-.user-avatar i {
-    font-size: 3rem;
-    color: #6c757d;
-}
-
-.user-info h6 {
-    margin: 0.5rem 0 0.25rem 0;
-    font-weight: 600;
-    color: #495057;
-}
-
-.user-info small {
-    color: #6c757d;
-    text-transform: uppercase;
-    font-weight: 500;
-    letter-spacing: 0.5px;
-}
-
-/* Navigation */
-.sidebar-nav {
-    flex: 1;
-    padding: 1rem 0;
-}
-
-.nav-section-header {
-    display: block;
-    padding: 1rem 1.5rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: #6c757d;
-    letter-spacing: 0.5px;
-    border-top: 1px solid #f1f3f4;
-    margin-top: 0.5rem;
-}
-
-.nav-section-header:first-child {
-    border-top: none;
-    margin-top: 0;
-}
-
-.nav-item {
-    margin: 0;
-}
-
-.nav-link {
-    display: flex;
-    align-items: center;
-    padding: 0.75rem 1.5rem;
-    color: #495057;
-    text-decoration: none;
-    transition: all 0.3s ease;
-    border-left: 3px solid transparent;
-    position: relative;
-}
-
-.nav-link:hover {
-    background-color: #f8f9fa;
-    color: #007bff;
-    text-decoration: none;
-}
-
-.nav-link.active {
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border-left-color: #1976d2;
-    font-weight: 600;
-}
-
-.nav-link i {
-    width: 20px;
-    margin-right: 0.75rem;
-    text-align: center;
-}
-
-.nav-link .badge {
-    margin-left: auto;
-    font-size: 0.7rem;
-    min-width: 18px;
-    height: 18px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.logout-section {
-    margin-top: auto;
-    border-top: 1px solid #dee2e6;
-    padding-top: 1rem;
-}
-
-.logout-section .nav-link:hover {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-/* Main Content */
-.main-content {
-    flex: 1;
-    margin-left: 280px;
-    padding: 2rem;
-    min-height: calc(100vh - 80px);
-}
-
-.main-content.no-sidebar {
-    margin-left: 0;
-}
-
-.content-wrapper {
-    max-width: 100%;
-}
-
-/* Flash Messages */
-.flash-messages {
-    margin-bottom: 2rem;
-}
-
-.flash-messages .alert {
-    border: none;
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    margin-bottom: 0.5rem;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-/* Animations */
-.fade-in {
-    animation: fadeIn 0.3s ease-in;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-    .sidebar {
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
-    
-    .sidebar.show {
-        transform: translateX(0);
-    }
-    
-    .main-content {
-        margin-left: 0;
-        padding: 1rem;
-    }
-    
-    .header {
-        padding: 1rem;
-    }
-    
-    .header h1 {
-        font-size: 1.25rem;
-    }
-}
-
-@media (max-width: 576px) {
-    .user-info {
-        padding: 1.5rem 1rem;
-    }
-    
-    .nav-link {
-        padding: 0.6rem 1rem;
-        font-size: 0.9rem;
-    }
-    
-    .nav-section-header {
-        padding: 0.75rem 1rem 0.25rem;
-        font-size: 0.7rem;
-    }
-}
-
-/* Scrollbar Styling */
-.sidebar::-webkit-scrollbar {
-    width: 6px;
-}
-
-.sidebar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-.sidebar::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 3px;
-}
-
-.sidebar::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
-}
-
-/* Print Styles */
-@media print {
-    .sidebar,
-    .header {
-        display: none !important;
-    }
-    
-    .main-content {
-        margin-left: 0 !important;
-        padding: 0 !important;
-    }
-}
-</style>

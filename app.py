@@ -1,28 +1,21 @@
-from flask import Flask, render_template, redirect, url_for, request, flash, session
+from flask import Flask, render_template, redirect, url_for, request, flash, session, jsonify
 from flask_session import Session
 from werkzeug.security import check_password_hash, generate_password_hash
 from cs50 import SQL
 from datetime import datetime, date
 import os
+from functools import wraps
 
 app = Flask(__name__)
-
-# Configure session
 app.config["SESSION_PERMANENT"] = False
 app.config["SESSION_TYPE"] = "filesystem"
 app.config["SECRET_KEY"] = "your-secret-key-change-this"
 app.config['TRAP_HTTP_EXCEPTIONS'] = True
 Session(app)
-# Custom error page for development
-if app.debug:
-    app.config['TRAP_BAD_REQUEST_ERRORS'] = True
 
-
-# Configure CS50 Library to use SQLite database
 db = SQL("sqlite:///institute.db")
 
 def login_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get("user_id") is None:
@@ -31,7 +24,6 @@ def login_required(f):
     return decorated_function
 
 def admin_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get("user_role") != 'admin':
@@ -41,7 +33,6 @@ def admin_required(f):
     return decorated_function
 
 def teacher_or_admin_required(f):
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get("user_role") not in ['admin', 'teacher']:
@@ -50,8 +41,12 @@ def teacher_or_admin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def is_notification_read(notification, user_id, user_role):
+    user_key = f"{user_role}_{user_id}"
+    read_by = notification.get('read_by', '')
+    return user_key in read_by.split(',') if read_by else False
+
 def can_send_messages(f):
-    from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get("user_role") not in ['admin', 'teacher', 'student']:
@@ -61,14 +56,7 @@ def can_send_messages(f):
     return decorated_function
 
 
-def is_notification_read(notification, user_id, user_role):
-    """Check if user has read the notification using simple string matching"""
-    user_key = f"{user_role}_{user_id}"
-    read_by = notification.get('read_by', '')
-    return user_key in read_by.split(',') if read_by else False
-
 def get_user_notifications(user_id, user_role, user_course=None):
-    """Get notifications for a specific user based on their role and course"""
     notifications = []
     
     if user_role == 'admin':
@@ -122,8 +110,35 @@ def get_user_notifications(user_id, user_role, user_course=None):
     
     return notifications
 
+def get_dashboard_stats():
+    user_role = session.get("user_role")
+    user_id = session.get("user_id")
+    
+    try:
+        pending_count = 0
+        unread_messages = 0
+        
+        if user_role == 'admin':
+            pending_count = db.execute("SELECT COUNT(*) as count FROM students WHERE status = 0")[0]['count']
+            pending_count += db.execute("SELECT COUNT(*) as count FROM teachers WHERE status = 0")[0]['count']
+            pending_count += db.execute("SELECT COUNT(*) as count FROM admin WHERE status = 0")[0]['count']
+        elif user_role == 'teacher':
+            pending_count = db.execute("SELECT COUNT(*) as count FROM students WHERE status = 0")[0]['count']
+        
+        unread_messages = db.execute("""
+            SELECT COUNT(*) as count FROM messages 
+            WHERE recipient_id = ? AND recipient_role = ? AND is_read = 0
+        """, user_id, user_role)[0]['count']
+        
+        return {
+            'pending_accounts_count': pending_count,
+            'unread_messages_count': unread_messages
+        }
+    except:
+        return {'pending_accounts_count': 0, 'unread_messages_count': 0}
+    
+    
 def get_pending_accounts_count(user_role):
-    """Get count of pending accounts based on user role"""
     count = 0
     try:
         if user_role == 'admin':
@@ -135,11 +150,9 @@ def get_pending_accounts_count(user_role):
             count = db.execute("SELECT COUNT(*) as count FROM students WHERE status = 0")[0]['count']
     except:
         count = 0
-    
     return count
 
 def get_unread_messages_count(user_id, user_role):
-    """Get count of unread messages for user"""
     try:
         count = db.execute("""
             SELECT COUNT(*) as count 
@@ -151,7 +164,6 @@ def get_unread_messages_count(user_id, user_role):
         return 0
 
 def calculate_grade(percentage):
-    """Calculate grade based on percentage"""
     if percentage >= 90: return 'A+'
     elif percentage >= 85: return 'A'
     elif percentage >= 80: return 'A-'
@@ -165,9 +177,7 @@ def calculate_grade(percentage):
     else: return 'F'
 
 def update_course_result(student_id, course_name):
-    """Calculate and update final course result based on all assessments"""
     try:
-        # Get all graded assessments for this student in this course
         assessments_data = db.execute("""
             SELECT a.weightage, g.percentage, a.assessment_type
             FROM assessments a
@@ -178,7 +188,6 @@ def update_course_result(student_id, course_name):
         if not assessments_data:
             return
         
-        # Calculate weighted average
         total_weightage = sum(item['weightage'] for item in assessments_data)
         if total_weightage == 0:
             return
@@ -188,7 +197,6 @@ def update_course_result(student_id, course_name):
         final_grade = calculate_grade(final_percentage)
         status = 'Pass' if final_percentage >= 50 else 'Fail'
         
-        # Update or insert course result
         db.execute("""
             INSERT OR REPLACE INTO course_results 
             (student_id, course_name, total_weightage, obtained_weightage, 
@@ -199,6 +207,8 @@ def update_course_result(student_id, course_name):
         
     except Exception as e:
         print(f"Error updating course result: {str(e)}")
+
+
 
 @app.context_processor
 def inject_global_vars():
@@ -221,7 +231,7 @@ def inject_global_vars():
         'unread_messages_count': 0,
         'current_date': date.today().strftime('%Y-%m-%d')
     }
-
+    
 @app.after_request
 def after_request(response):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -229,6 +239,8 @@ def after_request(response):
     response.headers["Pragma"] = "no-cache"
     return response
 
+
+# MAIN ROUTES
 @app.route('/')
 def index():
     if session.get("user_id"):
@@ -242,6 +254,8 @@ def start():
 @app.route('/login')
 def login():
     role = request.args.get('role', '')
+    if not role:
+        return redirect(url_for('start'))
     return render_template('login.html', role=role)
 
 @app.route('/login', methods=['POST'])
@@ -251,7 +265,7 @@ def login_post():
         password = request.form.get('password')
         role = request.form.get('role')
 
-        if not email or not password or not role:
+        if not all([email, password, role]):
             flash("All fields are required")
             return redirect(url_for('login', role=role))
 
@@ -265,6 +279,7 @@ def login_post():
                 user = users[0]
                 user['role'] = 'student'
                 user['id'] = user['student_id']
+                session["user_course"] = user.get('course', '')
 
         elif role == 'teacher':
             users = db.execute("SELECT * FROM teachers WHERE email = ?", email)
@@ -298,7 +313,6 @@ def login_post():
             return redirect(url_for('login', role=role))
 
     except Exception as e:
-        print(f"Login error: {str(e)}")
         flash("An error occurred during login. Please try again.")
         return redirect(url_for('login', role=role))
 
@@ -336,13 +350,14 @@ def register_post():
             flash("Password must be at least 6 characters long")
             return redirect(url_for('register', role=role))
 
+        # Check if email exists
         existing_users = []
         try:
             existing_users.extend(db.execute("SELECT email FROM students WHERE email = ?", email))
             existing_users.extend(db.execute("SELECT email FROM teachers WHERE email = ?", email))
             existing_users.extend(db.execute("SELECT email FROM admin WHERE email = ?", email))
-        except Exception as e:
-            print(f"Error checking existing users: {str(e)}")
+        except:
+            pass
 
         if existing_users:
             flash("Email already registered")
@@ -355,25 +370,21 @@ def register_post():
             course = request.form.get('course', '').strip()
             dob = request.form.get('dob', '').strip()
             gender = request.form.get('gender', '').strip()
-            
-            # Get parent details
             parent_name = request.form.get('parent_name', '').strip()
             parent_phone = request.form.get('parent_phone', '').strip()
             parent_email = request.form.get('parent_email', '').strip()
             parent_occupation = request.form.get('parent_occupation', '').strip()
             emergency_contact = request.form.get('emergency_contact', '').strip()
             
-            # Validate required fields
             if not all([course, dob, gender, parent_name, parent_phone]):
                 flash("Please fill all required fields including parent/guardian information.")
                 return redirect(url_for('register', role=role))
 
-            # Insert student with parent details
             db.execute("""
                 INSERT INTO students (name, email, password, phone, course, dob, gender, 
                                     parent_name, parent_phone, parent_email, parent_occupation, 
-                                    emergency_contact, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                                    emergency_contact, status, fee_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'unpaid')
             """, full_name, email, hashed_password, phone, course, dob, gender,
                  parent_name, parent_phone, parent_email, parent_occupation, emergency_contact)
             
@@ -381,12 +392,10 @@ def register_post():
             
         elif role == 'teacher':
             subject = request.form.get('subject', '').strip()
-            
             db.execute("""
                 INSERT INTO teachers (name, email, password, phone, subject, status)
                 VALUES (?, ?, ?, ?, ?, 0)
             """, full_name, email, hashed_password, phone, subject)
-            
             flash("Teacher registration successful! Please wait for admin approval.")
 
         elif role == 'admin':
@@ -394,13 +403,11 @@ def register_post():
                 INSERT INTO admin (name, email, password, phone, status)
                 VALUES (?, ?, ?, ?, 0)
             """, full_name, email, hashed_password, phone)
-            
             flash("Admin registration successful! Please wait for approval from another admin.")
 
         return redirect(url_for('login', role=role))
 
     except Exception as e:
-        print(f"Registration error: {str(e)}")
         flash(f"Registration failed: {str(e)}")
         return redirect(url_for('register', role=role or ''))
 
@@ -416,58 +423,70 @@ def dashboard():
     unread_count = len([n for n in notifications if not n['is_read']])
     
     # Get recent messages
-    recent_messages = db.execute("""
-        SELECT m.*, 
-               CASE 
-                   WHEN m.sender_role = 'admin' THEN a.name
-                   WHEN m.sender_role = 'teacher' THEN t.name
-               END as sender_name
-        FROM messages m
-        LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
-        LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
-        WHERE m.recipient_id = ? AND m.recipient_role = ?
-        ORDER BY m.sent_at DESC
-        LIMIT 5
-    """, user_id, user_role)
+    try:
+        recent_messages = db.execute("""
+            SELECT m.*, 
+                   CASE 
+                       WHEN m.sender_role = 'admin' THEN a.name
+                       WHEN m.sender_role = 'teacher' THEN t.name
+                       WHEN m.sender_role = 'student' THEN s.name
+                   END as sender_name
+            FROM messages m
+            LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
+            LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
+            LEFT JOIN students s ON m.sender_id = s.student_id AND m.sender_role = 'student'
+            WHERE m.recipient_id = ? AND m.recipient_role = ?
+            ORDER BY m.sent_at DESC
+            LIMIT 5
+        """, user_id, user_role)
+    except:
+        recent_messages = []
     
     # Get dashboard statistics
     stats = {}
     try:
         if user_role == 'admin':
-            stats['total_students'] = db.execute("SELECT COUNT(*) as count FROM students WHERE status = 1")[0]['count']
-            stats['total_teachers'] = db.execute("SELECT COUNT(*) as count FROM teachers WHERE status = 1")[0]['count']
-            stats['total_courses'] = db.execute("SELECT COUNT(*) as count FROM courses")[0]['count']
-            stats['pending_approvals'] = get_pending_accounts_count(user_role)
+            stats = {
+                'total_students': db.execute("SELECT COUNT(*) as count FROM students WHERE status = 1")[0]['count'],
+                'total_teachers': db.execute("SELECT COUNT(*) as count FROM teachers WHERE status = 1")[0]['count'],
+                'total_courses': db.execute("SELECT COUNT(*) as count FROM courses")[0]['count'],
+                'pending_approvals': get_dashboard_stats()['pending_accounts_count'],
+                'unpaid_fees': db.execute("SELECT COUNT(*) as count FROM students WHERE fee_status = 'unpaid' AND status = 1")[0]['count']
+            }
         elif user_role == 'teacher':
-            stats['my_students'] = db.execute("SELECT COUNT(*) as count FROM students WHERE status = 1")[0]['count']
-            stats['my_courses'] = db.execute("SELECT COUNT(*) as count FROM courses WHERE teacher_id = ?", user_id)[0]['count']
-            stats['assessments'] = db.execute("SELECT COUNT(*) as count FROM assessments WHERE teacher_id = ?", user_id)[0]['count']
-            stats['pending_approvals'] = get_pending_accounts_count(user_role)
+            stats = {
+                'my_students': db.execute("SELECT COUNT(*) as count FROM students WHERE status = 1")[0]['count'],
+                'my_courses': db.execute("SELECT COUNT(*) as count FROM courses WHERE teacher_id = ?", user_id)[0]['count'],
+                'assessments': db.execute("SELECT COUNT(*) as count FROM assessments WHERE teacher_id = ?", user_id)[0]['count'],
+                'pending_approvals': get_dashboard_stats()['pending_accounts_count']
+            }
         elif user_role == 'student':
-            # Get student's attendance percentage
             attendance_data = db.execute("""
                 SELECT COUNT(*) as total, 
                        SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present
                 FROM attendance WHERE student_id = ?
             """, user_id)
+            
             if attendance_data[0]['total'] > 0:
                 stats['attendance'] = round((attendance_data[0]['present'] / attendance_data[0]['total']) * 100, 1)
             else:
                 stats['attendance'] = 0
             
-            # Get average grade
             avg_result = db.execute("""
                 SELECT AVG(final_percentage) as avg_percentage
                 FROM course_results WHERE student_id = ?
             """, user_id)
+            
             if avg_result[0]['avg_percentage']:
                 stats['avg_percentage'] = round(avg_result[0]['avg_percentage'], 1)
                 stats['avg_grade'] = calculate_grade(stats['avg_percentage'])
             else:
                 stats['avg_percentage'] = 0
                 stats['avg_grade'] = 'N/A'
+            fee_status = db.execute("SELECT fee_status FROM students WHERE student_id = ?", user_id)
+            stats['fee_status'] = fee_status[0]['fee_status'] if fee_status else 'unknown'
+            
     except Exception as e:
-        print(f"Error loading dashboard stats: {str(e)}")
         stats = {}
     
     return render_template('dashboard.html', 
@@ -477,188 +496,6 @@ def dashboard():
                          unread_count=unread_count,
                          recent_messages=recent_messages,
                          stats=stats)
-
-# MESSAGING ROUTES
-@app.route('/messages')
-@login_required
-def messages():
-    """View all messages for the current user"""
-    user_id = session.get("user_id")
-    user_role = session.get("user_role")
-    
-    try:
-        # Get received messages
-        received_messages = db.execute("""
-            SELECT m.*, 
-                   CASE 
-                       WHEN m.sender_role = 'admin' THEN a.name
-                       WHEN m.sender_role = 'teacher' THEN t.name
-                   END as sender_name
-            FROM messages m
-            LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
-            LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
-            WHERE m.recipient_id = ? AND m.recipient_role = ?
-            ORDER BY m.sent_at DESC
-        """, user_id, user_role)
-        
-        # Get sent messages (only for teachers and admins)
-        sent_messages = []
-        if user_role in ['admin', 'teacher']:
-            sent_messages = db.execute("""
-                SELECT m.*, 
-                       CASE 
-                           WHEN m.recipient_role = 'admin' THEN a.name
-                           WHEN m.recipient_role = 'teacher' THEN t.name
-                           WHEN m.recipient_role = 'student' THEN s.name
-                       END as recipient_name
-                FROM messages m
-                LEFT JOIN admin a ON m.recipient_id = a.admin_id AND m.recipient_role = 'admin'
-                LEFT JOIN teachers t ON m.recipient_id = t.teacher_id AND m.recipient_role = 'teacher'
-                LEFT JOIN students s ON m.recipient_id = s.student_id AND m.recipient_role = 'student'
-                WHERE m.sender_id = ? AND m.sender_role = ?
-                ORDER BY m.sent_at DESC
-            """, user_id, user_role)
-        
-    except Exception as e:
-        print(f"Error loading messages: {str(e)}")
-        received_messages = []
-        sent_messages = []
-    
-    return render_template('messages.html',
-                         received_messages=received_messages,
-                         sent_messages=sent_messages,
-                         user_role=user_role)
-
-@app.route('/compose_message')
-@can_send_messages
-def compose_message():
-    """Compose a new message (Teachers, Admins, and Students)"""
-    user_role = session.get("user_role")
-    
-    try:
-        # Get potential recipients based on user role
-        recipients = []
-        
-        if user_role == 'admin':
-            # Admins can message teachers and students
-            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1")
-            students = db.execute("SELECT student_id as id, name, 'student' as role FROM students WHERE status = 1")
-            recipients = teachers + students
-            
-        elif user_role == 'teacher':
-            # Teachers can message admins, other teachers, and students
-            admins = db.execute("SELECT admin_id as id, name, 'admin' as role FROM admin WHERE status = 1")
-            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1 AND teacher_id != ?", session.get("user_id"))
-            students = db.execute("SELECT student_id as id, name, 'student' as role FROM students WHERE status = 1")
-            recipients = admins + teachers + students
-            
-        elif user_role == 'student':
-            # Students can only message admins and teachers
-            admins = db.execute("SELECT admin_id as id, name, 'admin' as role FROM admin WHERE status = 1")
-            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1")
-            recipients = admins + teachers
-            
-    except Exception as e:
-        print(f"Error loading recipients: {str(e)}")
-        recipients = []
-    
-    return render_template('compose_message.html', recipients=recipients)
-
-@app.route('/send_message', methods=['POST'])
-@can_send_messages
-def send_message():
-    """Send a message"""
-    try:
-        sender_id = session.get("user_id")
-        sender_role = session.get("user_role")
-        recipient_info = request.form.get('recipient', '').split('|')
-        
-        if len(recipient_info) != 2:
-            flash("Please select a valid recipient.")
-            return redirect(url_for('compose_message'))
-        
-        recipient_id = int(recipient_info[0])
-        recipient_role = recipient_info[1]
-        subject = request.form.get('subject', '').strip()
-        message_body = request.form.get('message_body', '').strip()
-        
-        if not subject or not message_body:
-            flash("Subject and message are required.")
-            return redirect(url_for('compose_message'))
-        
-        # Updated messaging rules validation
-        if sender_role == 'teacher' and recipient_role not in ['admin', 'teacher', 'student']:
-            flash("Teachers can only message admins, other teachers, or students.")
-            return redirect(url_for('compose_message'))
-        
-        if sender_role == 'admin' and recipient_role not in ['teacher', 'student']:
-            flash("Admins can only message teachers or students.")
-            return redirect(url_for('compose_message'))
-        
-        if sender_role == 'student' and recipient_role not in ['admin', 'teacher']:
-            flash("Students can only message admins or teachers.")
-            return redirect(url_for('compose_message'))
-        
-        # Prevent students from messaging other students
-        if sender_role == 'student' and recipient_role == 'student':
-            flash("Students cannot message other students.")
-            return redirect(url_for('compose_message'))
-        
-        # Insert message
-        db.execute("""
-            INSERT INTO messages (sender_id, sender_role, recipient_id, recipient_role, subject, message_body)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, sender_id, sender_role, recipient_id, recipient_role, subject, message_body)
-        
-        flash("Message sent successfully!")
-        return redirect(url_for('messages'))
-        
-    except Exception as e:
-        print(f"Error sending message: {str(e)}")
-        flash("Error sending message. Please try again.")
-        return redirect(url_for('compose_message'))
-
-@app.route('/read_message/<int:message_id>')
-@login_required
-def read_message(message_id):
-    """Mark message as read and view details"""
-    user_id = session.get("user_id")
-    user_role = session.get("user_role")
-    
-    try:
-        # Get message details
-        message = db.execute("""
-            SELECT m.*, 
-                   CASE 
-                       WHEN m.sender_role = 'admin' THEN a.name
-                       WHEN m.sender_role = 'teacher' THEN t.name
-                   END as sender_name
-            FROM messages m
-            LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
-            LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
-            WHERE m.message_id = ? AND m.recipient_id = ? AND m.recipient_role = ?
-        """, message_id, user_id, user_role)
-        
-        if not message:
-            flash("Message not found.")
-            return redirect(url_for('messages'))
-        
-        message = message[0]
-        
-        # Mark as read if not already read
-        if not message['is_read']:
-            db.execute("""
-                UPDATE messages 
-                SET is_read = 1, read_at = CURRENT_TIMESTAMP 
-                WHERE message_id = ?
-            """, message_id)
-        
-    except Exception as e:
-        print(f"Error reading message: {str(e)}")
-        flash("Error loading message.")
-        return redirect(url_for('messages'))
-    
-    return render_template('read_message.html', message=message)
 
 @app.route('/reply_message/<int:message_id>')
 @can_send_messages
@@ -725,7 +562,949 @@ def send_reply():
         flash("Error sending reply. Please try again.")
         return redirect(url_for('messages'))
 
-# ATTENDANCE ROUTES
+
+
+@app.route('/finance')
+@teacher_or_admin_required
+def finance():
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    transaction_type = request.args.get('type', '')
+    search_query = request.args.get('search', '')
+    
+    # Build query
+    query = "SELECT * FROM finance_ledger WHERE 1=1"
+    params = []
+    
+    if start_date:
+        query += " AND date >= ?"
+        params.append(start_date)
+    
+    if end_date:
+        query += " AND date <= ?"
+        params.append(end_date)
+    
+    if transaction_type:
+        query += " AND transaction_type = ?"
+        params.append(transaction_type)
+    
+    if search_query:
+        query += " AND description LIKE ?"
+        params.append(f"%{search_query}%")
+    
+    query += " ORDER BY date DESC, created_at DESC"
+    
+    try:
+        transactions = db.execute(query, *params)
+        
+        total_income = sum(t['amount'] for t in transactions if t['transaction_type'] == 'income')
+        total_expenditure = sum(t['amount'] for t in transactions if t['transaction_type'] == 'expenditure')
+        balance = total_income - total_expenditure
+        
+    except:
+        transactions = []
+        total_income = total_expenditure = balance = 0
+    
+    return render_template('finance.html',
+                         transactions=transactions,
+                         total_income=total_income,
+                         total_expenditure=total_expenditure,
+                         balance=balance,
+                         start_date=start_date,
+                         end_date=end_date,
+                         transaction_type=transaction_type,
+                         search_query=search_query)
+
+@app.route('/add_course', methods=['POST'])
+@admin_required
+def add_course():
+    """Add a new course"""
+    try:
+        course_name = request.form.get('course_name', '').strip()
+        teacher_id = request.form.get('teacher_id', '')
+        fee = request.form.get('fee', '')
+        duration = request.form.get('duration', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        if not course_name:
+            flash("Course name is required.")
+            return redirect(url_for('manage_courses'))
+        
+        existing = db.execute("SELECT * FROM courses WHERE course_name = ?", course_name)
+        if existing:
+            flash("Course with this name already exists.")
+            return redirect(url_for('manage_courses'))
+        
+        fee_value = float(fee) if fee else None
+        teacher_id_value = int(teacher_id) if teacher_id else None
+        
+        db.execute("""
+            INSERT INTO courses (course_name, teacher_id, fee, duration, description)
+            VALUES (?, ?, ?, ?, ?)
+        """, course_name, teacher_id_value, fee_value, duration, description)
+        
+        flash("Course added successfully!")
+        
+    except Exception as e:
+        print(f"Error adding course: {str(e)}")
+        flash("Error adding course. Please check your input.")
+    
+    return redirect(url_for('manage_courses'))
+
+@app.route('/assign_teacher/<int:course_id>', methods=['POST'])
+@admin_required
+def assign_teacher(course_id):
+    """Assign or unassign teacher to/from a course"""
+    try:
+        teacher_id = request.form.get('teacher_id', '')
+        
+        if teacher_id:
+            db.execute("UPDATE courses SET teacher_id = ? WHERE course_id = ?", int(teacher_id), course_id)
+            flash("Teacher assigned successfully!")
+        else:
+            db.execute("UPDATE courses SET teacher_id = NULL WHERE course_id = ?", course_id)
+            flash("Teacher unassigned successfully!")
+        
+    except Exception as e:
+        print(f"Error assigning teacher: {str(e)}")
+        flash("Error assigning teacher.")
+    
+    return redirect(url_for('manage_courses'))
+
+@app.route('/edit_student/<int:student_id>')
+@teacher_or_admin_required
+def edit_student(student_id):
+    """Edit student information form"""
+    try:
+        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
+        if not student:
+            flash("Student not found.")
+            return redirect(url_for('manage_students'))
+        
+        student = student[0]
+        courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
+        
+    except Exception as e:
+        print(f"Error loading student: {str(e)}")
+        flash("Error loading student.")
+        return redirect(url_for('manage_students'))
+    
+    return render_template('edit_student.html', student=student, courses=courses)
+
+
+@app.route('/edit_course/<int:course_id>', methods=['POST'])
+@admin_required
+def edit_course(course_id):
+    """Edit course"""
+    try:
+        course_name = request.form.get('course_name', '').strip()
+        teacher_id = request.form.get('teacher_id')
+        duration = request.form.get('duration', '').strip()
+        description = request.form.get('description', '').strip()
+        
+        fee_str = request.form.get('fee', '0').strip()
+        try:
+            fee = float(fee_str) if fee_str else None
+        except ValueError:
+            flash("Invalid fee value.")
+            return redirect(url_for('manage_courses'))
+
+        db.execute("""
+            UPDATE courses 
+            SET course_name = ?, teacher_id = ?, fee = ?, duration = ?, description = ?
+            WHERE course_id = ?
+        """, course_name, teacher_id if teacher_id else None, fee, duration, description, course_id)
+
+        flash("Course updated successfully!")
+
+    except Exception as e:
+        flash(f"Error updating course: {e}")
+    
+    return redirect(url_for('manage_courses'))
+
+@app.route('/delete_course/<int:course_id>', methods=['POST'])
+@admin_required
+def delete_course(course_id):
+    """Delete course"""
+    try:
+        db.execute("DELETE FROM courses WHERE course_id = ?", course_id)
+        flash("Course deleted successfully!")
+        
+    except Exception as e:
+        flash("Error deleting course")
+    
+    return redirect(url_for('manage_courses'))
+
+
+@app.route('/finance/add', methods=['GET', 'POST'])
+@teacher_or_admin_required
+def add_finance_entry():
+    """Add new finance entry"""
+    if request.method == 'POST':
+        try:
+            date_entry = request.form.get('date')
+            transaction_type = request.form.get('transaction_type')
+            amount = float(request.form.get('amount'))
+            description = request.form.get('description', '').strip()
+            
+            if not all([date_entry, transaction_type, amount, description]):
+                flash("All fields are required")
+                return redirect(url_for('add_finance_entry'))
+            
+            if amount <= 0:
+                flash("Amount must be positive")
+                return redirect(url_for('add_finance_entry'))
+            
+            db.execute("""
+                INSERT INTO finance_ledger (date, transaction_type, amount, description, created_by, created_by_role)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, date_entry, transaction_type, amount, description, session.get('user_id'), session.get('user_role'))
+            
+            flash("Finance entry added successfully!")
+            return redirect(url_for('finance'))
+            
+        except Exception as e:
+            flash("Error adding finance entry")
+            return redirect(url_for('add_finance_entry'))
+    
+    return render_template('add_finance_entry.html')
+
+@app.route('/finance/report')
+@teacher_or_admin_required
+def finance_report():
+    """Generate finance report"""
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    
+    if not start_date or not end_date:
+        flash("Please select both start and end dates for the report")
+        return redirect(url_for('finance'))
+    
+    try:
+        transactions = db.execute("""
+            SELECT * FROM finance_ledger 
+            WHERE date >= ? AND date <= ?
+            ORDER BY date DESC
+        """, start_date, end_date)
+        
+        # Calculate summary
+        total_income = sum(t['amount'] for t in transactions if t['transaction_type'] == 'income')
+        total_expenditure = sum(t['amount'] for t in transactions if t['transaction_type'] == 'expenditure')
+        net_balance = total_income - total_expenditure
+        
+        # Daily summary
+        daily_summary = {}
+        for transaction in transactions:
+            date_key = transaction['date']
+            if date_key not in daily_summary:
+                daily_summary[date_key] = {'income': 0, 'expenditure': 0}
+            daily_summary[date_key][transaction['transaction_type']] += transaction['amount']
+        
+    except:
+        transactions = []
+        total_income = total_expenditure = net_balance = 0
+        daily_summary = {}
+    
+    return render_template('finance_report.html',
+                         transactions=transactions,
+                         total_income=total_income,
+                         total_expenditure=total_expenditure,
+                         net_balance=net_balance,
+                         daily_summary=daily_summary,
+                         start_date=start_date,
+                         end_date=end_date)
+
+@app.route('/student_details/<int:student_id>')
+@teacher_or_admin_required
+def student_details(student_id):
+    """View detailed information about a specific student"""
+    user_role = session.get('user_role')
+    
+    try:
+        # Get student basic info
+        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
+        if not student:
+            flash("Student not found.")
+            return redirect(url_for('manage_students'))
+        
+        student = student[0]
+        
+        # Get attendance data
+        attendance_data = db.execute("""
+            SELECT a.*, 
+                   CASE 
+                       WHEN a.marked_by_role = 'teacher' THEN t.name
+                       WHEN a.marked_by_role = 'admin' THEN ad.name
+                   END as marked_by_name
+            FROM attendance a
+            LEFT JOIN teachers t ON a.marked_by = t.teacher_id AND a.marked_by_role = 'teacher'
+            LEFT JOIN admin ad ON a.marked_by = ad.admin_id AND a.marked_by_role = 'admin'
+            WHERE a.student_id = ?
+            ORDER BY a.date DESC
+            LIMIT 20
+        """, student_id)
+        
+        # Calculate attendance statistics
+        total_attendance = len(attendance_data)
+        present_count = len([a for a in attendance_data if a['status'] == 'present'])
+        attendance_percentage = round((present_count / total_attendance) * 100, 1) if total_attendance > 0 else 0
+        
+        # Get course results
+        course_results = db.execute("""
+            SELECT * FROM course_results WHERE student_id = ?
+        """, student_id)
+        
+        # Get assessment details
+        assessment_details = db.execute("""
+            SELECT a.assessment_name, a.assessment_type, a.total_marks, a.weightage,
+                   g.obtained_marks, g.percentage, a.course_name, a.assessment_date,
+                   g.remarks
+            FROM assessments a
+            JOIN grades g ON a.assessment_id = g.assessment_id
+            WHERE g.student_id = ?
+            ORDER BY a.assessment_date DESC
+        """, student_id)
+        
+        # Calculate overall statistics
+        overall_avg = 0
+        if course_results:
+            total_percentage = sum([cr['final_percentage'] for cr in course_results if cr['final_percentage']])
+            overall_avg = round(total_percentage / len(course_results), 1) if course_results else 0
+        
+        stats = {
+            'total_attendance': total_attendance,
+            'present_count': present_count,
+            'attendance_percentage': attendance_percentage,
+            'total_courses': len(course_results),
+            'overall_avg': overall_avg,
+            'total_assessments': len(assessment_details)
+        }
+        
+    except Exception as e:
+        print(f"Error loading student details: {str(e)}")
+        flash("Error loading student details.")
+        return redirect(url_for('manage_students'))
+    
+    return render_template('student_details.html',
+                         student=student,
+                         attendance_data=attendance_data,
+                         course_results=course_results,
+                         assessment_details=assessment_details,
+                         stats=stats,
+                         user_role=user_role)
+
+
+@app.route('/update_student/<int:student_id>', methods=['POST'])
+@teacher_or_admin_required
+def update_student(student_id):
+    """Update student information"""
+    try:
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        course = request.form.get('course', '').strip()
+        dob = request.form.get('dob', '')
+        gender = request.form.get('gender', '')
+        parent_name = request.form.get('parent_name', '').strip()
+        parent_phone = request.form.get('parent_phone', '').strip()
+        parent_email = request.form.get('parent_email', '').strip()
+        parent_occupation = request.form.get('parent_occupation', '').strip()
+        emergency_contact = request.form.get('emergency_contact', '').strip()
+        
+        # Validate required fields
+        if not all([name, email, phone, course]):
+            flash("Name, email, phone, and course are required.")
+            return redirect(url_for('edit_student', student_id=student_id))
+        
+        # Check if email exists for other students
+        existing = db.execute("SELECT * FROM students WHERE email = ? AND student_id != ?", email, student_id)
+        if existing:
+            flash("Email already exists for another student.")
+            return redirect(url_for('edit_student', student_id=student_id))
+        
+        # Update student
+        db.execute("""
+            UPDATE students 
+            SET name = ?, email = ?, phone = ?, course = ?, dob = ?, gender = ?,
+                parent_name = ?, parent_phone = ?, parent_email = ?, 
+                parent_occupation = ?, emergency_contact = ?
+            WHERE student_id = ?
+        """, name, email, phone, course, dob, gender, parent_name, parent_phone, 
+             parent_email, parent_occupation, emergency_contact, student_id)
+        
+        flash("Student information updated successfully!")
+        return redirect(url_for('student_details', student_id=student_id))
+        
+    except Exception as e:
+        print(f"Error updating student: {str(e)}")
+        flash("Error updating student.")
+        return redirect(url_for('edit_student', student_id=student_id))
+
+@app.route('/teacher_details/<int:teacher_id>')
+@admin_required
+def teacher_details(teacher_id):
+    """View detailed information about a specific teacher (Admin only)"""
+    try:
+        # Get teacher basic info
+        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
+        if not teacher:
+            flash("Teacher not found.")
+            return redirect(url_for('manage_teachers'))
+        
+        teacher = teacher[0]
+        
+        # Get assigned courses
+        assigned_courses = db.execute("""
+            SELECT * FROM courses WHERE teacher_id = ?
+        """, teacher_id)
+        
+        # Get created assessments
+        assessments = db.execute("""
+            SELECT a.*, COUNT(g.grade_id) as graded_count,
+                   (SELECT COUNT(*) FROM students s WHERE s.course = a.course_name AND s.status = 1) as total_students
+            FROM assessments a
+            LEFT JOIN grades g ON a.assessment_id = g.assessment_id
+            WHERE a.teacher_id = ?
+            GROUP BY a.assessment_id
+            ORDER BY a.created_at DESC
+        """, teacher_id)
+        
+        # Get students under this teacher (based on course assignment)
+        students_taught = []
+        if assigned_courses:
+            course_names = [course['course_name'] for course in assigned_courses]
+            placeholders = ','.join(['?' for _ in course_names])
+            students_taught = db.execute(f"""
+                SELECT DISTINCT s.student_id, s.name, s.email, s.course
+                FROM students s
+                WHERE s.course IN ({placeholders}) AND s.status = 1
+                ORDER BY s.name
+            """, *course_names)
+        
+        # Calculate statistics
+        total_students = len(students_taught)
+        total_assessments = len(assessments)
+        total_courses = len(assigned_courses)
+        
+        # Calculate grading progress
+        total_possible_grades = sum([a['total_students'] for a in assessments])
+        total_graded = sum([a['graded_count'] for a in assessments])
+        grading_percentage = round((total_graded / total_possible_grades) * 100, 1) if total_possible_grades > 0 else 0
+        
+        stats = {
+            'total_students': total_students,
+            'total_assessments': total_assessments,
+            'total_courses': total_courses,
+            'grading_percentage': grading_percentage,
+            'total_graded': total_graded,
+            'total_possible_grades': total_possible_grades
+        }
+        
+    except Exception as e:
+        print(f"Error loading teacher details: {str(e)}")
+        flash("Error loading teacher details.")
+        return redirect(url_for('manage_teachers'))
+    
+    return render_template('teacher_details.html',
+                         teacher=teacher,
+                         assigned_courses=assigned_courses,
+                         assessments=assessments,
+                         students_taught=students_taught,
+                         stats=stats)
+
+
+
+@app.route('/fee_management')
+@teacher_or_admin_required
+def fee_management():
+    """Manage student fees"""
+    search_query = request.args.get('search', '')
+    course_filter = request.args.get('course', '')
+    status_filter = request.args.get('status', '')
+    
+    query = """
+        SELECT s.student_id, s.name, s.email, s.course, s.phone, s.fee_status,
+               c.fee as course_fee
+        FROM students s
+        LEFT JOIN courses c ON s.course = c.course_name
+        WHERE s.status = 1
+    """
+    params = []
+    
+    if search_query:
+        query += " AND (s.name LIKE ? OR s.email LIKE ?)"
+        params.extend([f"%{search_query}%", f"%{search_query}%"])
+    
+    if course_filter:
+        query += " AND s.course = ?"
+        params.append(course_filter)
+    
+    if status_filter:
+        query += " AND s.fee_status = ?"
+        params.append(status_filter)
+    
+    query += " ORDER BY s.name"
+    
+    try:
+        students = db.execute(query, *params)
+        courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
+        
+        # Calculate statistics
+        total_students = len(students)
+        paid_students = len([s for s in students if s['fee_status'] == 'paid'])
+        unpaid_students = total_students - paid_students
+        
+    except:
+        students = []
+        courses = []
+        total_students = paid_students = unpaid_students = 0
+    
+    return render_template('fee_management.html',
+                         students=students,
+                         courses=courses,
+                         total_students=total_students,
+                         paid_students=paid_students,
+                         unpaid_students=unpaid_students,
+                         search_query=search_query,
+                         course_filter=course_filter,
+                         status_filter=status_filter)
+@app.route('/messages')
+@login_required
+def messages():
+    user_id = session.get("user_id")
+    user_role = session.get("user_role")
+    
+    try:
+        received_messages = db.execute("""
+            SELECT m.*, 
+                CASE 
+                    WHEN m.sender_role = 'admin' THEN a.name
+                    WHEN m.sender_role = 'teacher' THEN t.name
+                    WHEN m.sender_role = 'student' THEN s.name
+                END as sender_name
+            FROM messages m
+            LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
+            LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
+            LEFT JOIN students s ON m.sender_id = s.student_id AND m.sender_role = 'student'
+            WHERE m.recipient_id = ? AND m.recipient_role = ?
+            ORDER BY m.sent_at DESC
+        """, user_id, user_role)
+
+        
+        sent_messages = []
+        if user_role in ['admin', 'teacher']:
+            sent_messages = db.execute("""
+                SELECT m.*, 
+                       CASE 
+                           WHEN m.recipient_role = 'admin' THEN a.name
+                           WHEN m.recipient_role = 'teacher' THEN t.name
+                           WHEN m.recipient_role = 'student' THEN s.name
+                       END as recipient_name
+                FROM messages m
+                LEFT JOIN admin a ON m.recipient_id = a.admin_id AND m.recipient_role = 'admin'
+                LEFT JOIN teachers t ON m.recipient_id = t.teacher_id AND m.recipient_role = 'teacher'
+                LEFT JOIN students s ON m.recipient_id = s.student_id AND m.recipient_role = 'student'
+                WHERE m.sender_id = ? AND m.sender_role = ?
+                ORDER BY m.sent_at DESC
+            """, user_id, user_role)
+        
+    except Exception as e:
+        print(f"Error loading messages: {str(e)}")
+        received_messages = []
+        sent_messages = []
+    
+    return render_template('messages.html',
+                         received_messages=received_messages,
+                         sent_messages=sent_messages,
+                         user_role=user_role)
+
+@app.route('/compose_message')
+@login_required
+def compose_message():
+    user_role = session.get("user_role")
+    
+    try:
+        recipients = []
+        
+        if user_role == 'admin':
+            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1")
+            students = db.execute("SELECT student_id as id, name, 'student' as role FROM students WHERE status = 1")
+            recipients = teachers + students
+            
+        elif user_role == 'teacher':
+            admins = db.execute("SELECT admin_id as id, name, 'admin' as role FROM admin WHERE status = 1")
+            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1 AND teacher_id != ?", session.get("user_id"))
+            students = db.execute("SELECT student_id as id, name, 'student' as role FROM students WHERE status = 1")
+            recipients = admins + teachers + students
+            
+        elif user_role == 'student':
+            admins = db.execute("SELECT admin_id as id, name, 'admin' as role FROM admin WHERE status = 1")
+            teachers = db.execute("SELECT teacher_id as id, name, 'teacher' as role FROM teachers WHERE status = 1")
+            recipients = admins + teachers
+            
+    except Exception as e:
+        print(f"Error loading recipients: {str(e)}")
+        recipients = []
+    
+    return render_template('compose_message.html', recipients=recipients)
+
+@app.route('/send_message', methods=['POST'])
+@login_required
+def send_message():
+    try:
+        sender_id = session.get("user_id")
+        sender_role = session.get("user_role")
+        recipient_info = request.form.get('recipient', '').split('|')
+        
+        if len(recipient_info) != 2:
+            flash("Please select a valid recipient.")
+            return redirect(url_for('compose_message'))
+        
+        recipient_id = int(recipient_info[0])
+        recipient_role = recipient_info[1]
+        subject = request.form.get('subject', '').strip()
+        message_body = request.form.get('message_body', '').strip()
+        
+        if not subject or not message_body:
+            flash("Subject and message are required.")
+            return redirect(url_for('compose_message'))
+        
+        db.execute("""
+            INSERT INTO messages (sender_id, sender_role, recipient_id, recipient_role, subject, message_body)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, sender_id, sender_role, recipient_id, recipient_role, subject, message_body)
+        
+        flash("Message sent successfully!")
+        return redirect(url_for('messages'))
+        
+    except Exception as e:
+        print(f"Error sending message: {str(e)}")
+        flash("Error sending message. Please try again.")
+        return redirect(url_for('compose_message'))
+
+@app.route('/read_message/<int:message_id>')
+@login_required
+def read_message(message_id):
+    user_id = session.get("user_id")
+    user_role = session.get("user_role")
+    
+    try:
+        message = db.execute("""
+            SELECT m.*, 
+                CASE 
+                    WHEN m.sender_role = 'admin' THEN a.name
+                    WHEN m.sender_role = 'teacher' THEN t.name
+                    WHEN m.sender_role = 'student' THEN s.name
+                END as sender_name
+            FROM messages m
+            LEFT JOIN admin a ON m.sender_id = a.admin_id AND m.sender_role = 'admin'
+            LEFT JOIN teachers t ON m.sender_id = t.teacher_id AND m.sender_role = 'teacher'
+            LEFT JOIN students s ON m.sender_id = s.student_id AND m.sender_role = 'student'
+            WHERE m.message_id = ? AND m.recipient_id = ? AND m.recipient_role = ?
+        """, message_id, user_id, user_role)
+
+        if not message:
+            flash("Message not found.")
+            return redirect(url_for('messages'))
+        
+        message = message[0]
+        
+        if not message['is_read']:
+            db.execute("""
+                UPDATE messages 
+                SET is_read = 1, read_at = CURRENT_TIMESTAMP 
+                WHERE message_id = ?
+            """, message_id)
+        
+    except Exception as e:
+        print(f"Error reading message: {str(e)}")
+        flash("Error loading message.")
+        return redirect(url_for('messages'))
+    
+    return render_template('read_message.html', message=message)
+
+@app.route('/update_fee_status/<int:student_id>', methods=['POST'])
+@teacher_or_admin_required
+def update_fee_status(student_id):
+    """Update student fee status"""
+    try:
+        new_status = request.form.get('fee_status')
+        if new_status not in ['paid', 'unpaid', 'partial']:
+            flash("Invalid fee status")
+            return redirect(url_for('fee_management'))
+        
+        db.execute("UPDATE students SET fee_status = ? WHERE student_id = ?", new_status, student_id)
+        
+        # Add finance entry if marking as paid
+        if new_status == 'paid':
+            student = db.execute("SELECT s.name, c.fee FROM students s LEFT JOIN courses c ON s.course = c.course_name WHERE s.student_id = ?", student_id)[0]
+            if student['fee']:
+                db.execute("""
+                    INSERT INTO finance_ledger (date, transaction_type, amount, description, created_by, created_by_role)
+                    VALUES (?, 'income', ?, ?, ?, ?)
+                """, date.today().strftime('%Y-%m-%d'), student['fee'], 
+                     f"Fee payment from {student['name']}", session.get('user_id'), session.get('user_role'))
+        
+        flash("Fee status updated successfully!")
+        
+    except Exception as e:
+        flash("Error updating fee status")
+    
+    return redirect(url_for('fee_management'))
+
+# NOTIFICATION MANAGEMENT ROUTES
+
+
+@app.route('/delete_notification/<int:notification_id>', methods=['POST'])
+@admin_required
+def delete_notification(notification_id):
+    """Delete a specific notification (Admin only)"""
+    try:
+        db.execute("DELETE FROM notifications WHERE notification_id = ?", notification_id)
+        flash("Notification deleted successfully!")
+    except Exception as e:
+        print(f"Error deleting notification: {str(e)}")
+        flash("Error deleting notification")
+    
+    return redirect(url_for('manage_notifications'))
+
+@app.route('/delete_all_notifications', methods=['POST'])
+@admin_required
+def delete_all_notifications():
+    """Delete all notifications (Admin only)"""
+    try:
+        db.execute("DELETE FROM notifications")
+        flash("All notifications deleted successfully!")
+    except Exception as e:
+        flash("Error deleting notifications")
+    
+    return redirect(url_for('manage_notifications'))
+
+
+@app.route('/manage_notifications')
+@admin_required
+def manage_notifications():
+    """Manage all notifications (Admin only)"""
+    try:
+        notifications = db.execute("""
+            SELECT n.*, 
+                   CASE 
+                       WHEN n.created_by_role = 'admin' THEN a.name
+                       WHEN n.created_by_role = 'teacher' THEN t.name
+                   END as creator_name
+            FROM notifications n
+            LEFT JOIN admin a ON n.created_by = a.admin_id AND n.created_by_role = 'admin'
+            LEFT JOIN teachers t ON n.created_by = t.teacher_id AND n.created_by_role = 'teacher'
+            ORDER BY n.created_at DESC
+        """)
+    except:
+        notifications = []
+    
+    return render_template('manage_notifications.html', notifications=notifications)
+
+
+@app.route('/assessments')
+@teacher_or_admin_required  
+def assessments():
+    """View all assessments"""
+    user_id = session.get("user_id")
+    user_role = session.get("user_role")
+    
+    try:
+        if user_role == 'admin':
+            assessments = db.execute("""
+                SELECT a.*, t.name as teacher_name, COUNT(g.grade_id) as student_count
+                FROM assessments a
+                LEFT JOIN teachers t ON a.teacher_id = t.teacher_id
+                LEFT JOIN grades g ON a.assessment_id = g.assessment_id
+                GROUP BY a.assessment_id
+                ORDER BY a.created_at DESC
+            """)
+        else:
+            assessments = db.execute("""
+                SELECT a.*, COUNT(g.grade_id) as student_count
+                FROM assessments a
+                LEFT JOIN grades g ON a.assessment_id = g.assessment_id
+                WHERE a.teacher_id = ?
+                GROUP BY a.assessment_id
+                ORDER BY a.created_at DESC
+            """, user_id)
+    except:
+        assessments = []
+    
+    return render_template('assessments.html', assessments=assessments)
+
+@app.route('/create_assessment')
+@teacher_or_admin_required
+def create_assessment():
+    """Create new assessment form"""
+    try:
+        courses = db.execute("SELECT * FROM courses ORDER BY course_name")
+    except:
+        courses = []
+    assessment_types = ['Quiz', 'Assignment', 'Midterm', 'Final Exam', 'Project', 'Presentation', 'Lab Work']
+    
+    return render_template('create_assessment.html', courses=courses, assessment_types=assessment_types)
+
+@app.route('/create_assessment', methods=['POST'])
+@teacher_or_admin_required
+def create_assessment_post():
+    """Handle assessment creation"""
+    try:
+        user_id = session.get("user_id")
+        
+        assessment_name = request.form.get('assessment_name', '').strip()
+        course_name = request.form.get('course_name', '')
+        assessment_type = request.form.get('assessment_type', '')
+        total_marks = float(request.form.get('total_marks', 0)) 
+
+        weightage = float(request.form.get('weightage', 0))
+        assessment_date = request.form.get('assessment_date', '')
+        
+        if not all([assessment_name, course_name, assessment_type, total_marks, weightage, assessment_date]):
+            flash("All fields are required")
+            return redirect(url_for('create_assessment'))
+        
+        db.execute("""
+            INSERT INTO assessments (title, course_name, assessment_type, max_marks, 
+                                   weightage, assessment_date, teacher_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'active')
+        """, assessment_name, course_name, assessment_type, total_marks, weightage, assessment_date, user_id)
+        
+        flash("Assessment created successfully!")
+        return redirect(url_for('assessments'))
+        
+    except Exception as e:
+        flash("Error creating assessment")
+        return redirect(url_for('create_assessment'))
+
+@app.route('/grade_assessment/<int:assessment_id>')
+@teacher_or_admin_required
+def grade_assessment(assessment_id):
+    """Grade students for an assessment"""
+    try:
+        assessment = db.execute("SELECT * FROM assessments WHERE assessment_id = ?", assessment_id)[0]
+        students = db.execute("""
+            SELECT s.student_id, s.name, s.course 
+            FROM students s 
+            WHERE s.course = ? AND s.status = 1
+            ORDER BY s.name
+        """, assessment['course_name'])
+        
+        # Get existing grades
+        grades = db.execute("""
+            SELECT * FROM grades WHERE assessment_id = ?
+        """, assessment_id)
+        
+        grades_dict = {g['student_id']: g for g in grades}
+        
+    except:
+        flash("Assessment not found")
+        return redirect(url_for('assessments'))
+    
+    return render_template('grade_assessment.html', 
+                         assessment=assessment, 
+                         students=students, 
+                         grades=grades_dict)
+
+@app.route('/submit_grades/<int:assessment_id>', methods=['POST'])
+@teacher_or_admin_required
+def submit_grades(assessment_id):
+    """Submit grades for an assessment"""
+    try:
+        for key, value in request.form.items():
+            if key.startswith('marks_'):
+                student_id = int(key.split('_')[1])
+                obtained_marks = float(value) if value else 0
+                
+                # Get assessment details
+                assessment = db.execute("SELECT * FROM assessments WHERE assessment_id = ?", assessment_id)[0]
+                percentage = (obtained_marks / assessment['total_marks']) * 100
+                
+                # Check if grade exists
+                existing = db.execute("""
+                    SELECT * FROM grades WHERE assessment_id = ? AND student_id = ?
+                """, assessment_id, student_id)
+                
+                if existing:
+                    db.execute("""
+                        UPDATE grades 
+                        SET obtained_marks = ?, percentage = ?, graded_at = CURRENT_TIMESTAMP
+                        WHERE assessment_id = ? AND student_id = ?
+                    """, obtained_marks, percentage, assessment_id, student_id)
+                else:
+                    db.execute("""
+                        INSERT INTO grades (assessment_id, student_id, obtained_marks, percentage)
+                        VALUES (?, ?, ?, ?)
+                    """, assessment_id, student_id, obtained_marks, percentage)
+                
+                # Update course result
+                student = db.execute("SELECT course FROM students WHERE student_id = ?", student_id)[0]
+                update_course_result(student_id, student['course'])
+        
+        flash("Grades submitted successfully!")
+        return redirect(url_for('assessments'))
+        
+    except Exception as e:
+        flash("Error submitting grades")
+        return redirect(url_for('grade_assessment', assessment_id=assessment_id))
+
+
+@app.route('/student_results')
+@login_required
+def student_results():
+    """View student's own results"""
+    user_role = session.get("user_role")
+    if user_role != 'student':
+        return redirect(url_for('all_student_results'))
+    
+    user_id = session.get("user_id")
+    
+    try:
+        results = db.execute("""
+            SELECT cr.*, a.title, a.assessment_type, a.max_marks, g.marks_obtained
+            FROM course_results cr
+            LEFT JOIN assessments a ON cr.course_name = a.course_name
+            LEFT JOIN grades g ON a.assessment_id = g.assessment_id AND g.student_id = cr.student_id
+            WHERE cr.student_id = ?
+            ORDER BY cr.course_name
+        """, user_id)
+    except:
+        results = []
+    
+    return render_template('student_results.html', results=results)
+
+@app.route('/all_student_results')
+@teacher_or_admin_required
+def all_student_results():
+    """View all student results"""
+    course_filter = request.args.get('course', '')
+    
+    try:
+        query = """
+            SELECT s.student_id, s.name, s.course, cr.final_percentage, cr.final_grade, cr.status
+            FROM students s
+            LEFT JOIN course_results cr ON s.student_id = cr.student_id
+            WHERE s.status = 1
+        """
+        params = []
+        
+        if course_filter:
+            query += " AND s.course = ?"
+            params.append(course_filter)
+        
+        query += " ORDER BY s.name"
+        
+        results = db.execute(query, *params)
+        courses = db.execute("SELECT DISTINCT course_name FROM courses")
+        
+    except:
+        results = []
+        courses = []
+    
+    return render_template('all_student_results.html', results=results, courses=courses)
+
+
 @app.route('/attendance')
 @login_required
 def attendance():
@@ -741,11 +1520,9 @@ def attendance():
     attendance_records = []
     
     try:
-        # Get available courses
         courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
         
         if user_role == 'teacher':
-            # Teachers can mark attendance for any course
             if selected_course:
                 students = db.execute("""
                     SELECT student_id, name, course, email 
@@ -754,7 +1531,6 @@ def attendance():
                     ORDER BY name
                 """, selected_course)
         elif user_role == 'admin':
-            # Admins can mark attendance for any course
             if selected_course:
                 students = db.execute("""
                     SELECT student_id, name, course, email 
@@ -763,14 +1539,10 @@ def attendance():
                     ORDER BY name
                 """, selected_course)
         elif user_role == 'student':
-            # Students can only VIEW their attendance, not mark it
             selected_course = user_course
-            # No students list for marking - students cannot mark attendance
         
-        # Get existing attendance records for the selected date and course
         if selected_course:
             if user_role == 'student':
-                # Students can only see their own attendance
                 attendance_records = db.execute("""
                     SELECT a.*, s.name as student_name,
                            CASE 
@@ -785,7 +1557,6 @@ def attendance():
                     ORDER BY s.name
                 """, selected_date, selected_course, user_id)
             else:
-                # Teachers and admins can see all attendance for the course
                 attendance_records = db.execute("""
                     SELECT a.*, s.name as student_name,
                            CASE 
@@ -812,17 +1583,73 @@ def attendance():
                          selected_course=selected_course,
                          user_role=user_role)
 
+@app.route('/attendance_report')
+@login_required
+def attendance_report():
+    """Generate attendance reports"""
+    user_role = session.get("user_role")
+    user_id = session.get("user_id")
+    
+    course_filter = request.args.get('course', '')
+    start_date = request.args.get('start_date', '')
+    end_date = request.args.get('end_date', '')
+    
+    try:
+        if user_role == 'student':
+            # Student sees only their attendance
+            course_filter = session.get("user_course", '')
+            attendance_data = db.execute("""
+                SELECT date, status, course_name
+                FROM attendance 
+                WHERE student_id = ? AND course_name = ?
+                ORDER BY date DESC
+            """, user_id, course_filter)
+        else:
+            # Teachers and admins see all attendance
+            query = """
+                SELECT a.*, s.name as student_name
+                FROM attendance a
+                JOIN students s ON a.student_id = s.student_id
+                WHERE 1=1
+            """
+            params = []
+            
+            if course_filter:
+                query += " AND a.course_name = ?"
+                params.append(course_filter)
+            
+            if start_date:
+                query += " AND a.date >= ?"
+                params.append(start_date)
+            
+            if end_date:
+                query += " AND a.date <= ?"
+                params.append(end_date)
+            
+            query += " ORDER BY a.date DESC, s.name"
+            
+            attendance_data = db.execute(query, *params)
+        
+        courses = db.execute("SELECT DISTINCT course_name FROM courses")
+        
+    except:
+        attendance_data = []
+        courses = []
+    
+    return render_template('attendance_report.html', 
+                         attendance_data=attendance_data,
+                         courses=courses,
+                         course_filter=course_filter,
+                         start_date=start_date,
+                         end_date=end_date)
+
+
 @app.route('/mark_attendance', methods=['POST'])
-@teacher_or_admin_required  # This decorator already prevents students
+@teacher_or_admin_required
 def mark_attendance():
     try:
         user_id = session.get("user_id")
         user_role = session.get("user_role")
-        
-        # Additional check to ensure students cannot mark attendance
-        if user_role == 'student':
-            flash("Students are not authorized to mark attendance.")
-            return redirect(url_for('attendance'))
         
         attendance_date = request.form.get('date')
         course_name = request.form.get('course')
@@ -833,14 +1660,12 @@ def mark_attendance():
             flash("All fields are required for marking attendance.")
             return redirect(url_for('attendance', date=attendance_date, course=course_name))
         
-        # Check if attendance already exists
         existing = db.execute("""
             SELECT * FROM attendance 
             WHERE student_id = ? AND course_name = ? AND date = ?
         """, student_id, course_name, attendance_date)
         
         if existing:
-            # Update existing attendance
             db.execute("""
                 UPDATE attendance 
                 SET status = ?, marked_by = ?, marked_by_role = ?, marked_at = CURRENT_TIMESTAMP
@@ -848,7 +1673,6 @@ def mark_attendance():
             """, status, user_id, user_role, student_id, course_name, attendance_date)
             flash("Attendance updated successfully!")
         else:
-            # Insert new attendance record
             db.execute("""
                 INSERT INTO attendance (student_id, course_name, date, status, marked_by, marked_by_role)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -862,429 +1686,259 @@ def mark_attendance():
         flash("Error marking attendance. Please try again.")
         return redirect(url_for('attendance'))
 
-@app.route('/attendance_report')
-@login_required
-def attendance_report():
+# STUDENT MANAGEMENT
+@app.route('/manage_students')
+@teacher_or_admin_required
+def manage_students():
     user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    user_course = session.get("user_course", '')
     
-    # Get filter parameters
-    start_date = request.args.get('start_date', '')
-    end_date = request.args.get('end_date', '')
     course_filter = request.args.get('course', '')
-    student_filter = request.args.get('student', '')
-    
-    courses = []
-    students = []
-    attendance_data = []
+    status_filter = request.args.get('status', '')
+    search_query = request.args.get('search', '')
+    fee_filter = request.args.get('fee_status', '')
     
     try:
-        # Get available courses based on user role
-        if user_role in ['admin', 'teacher']:
-            courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
-            if course_filter:
-                students = db.execute("""
-                    SELECT student_id, name FROM students 
-                    WHERE course = ? AND status = 1 ORDER BY name
-                """, course_filter)
-        else:  # student
-            courses = [{'course_name': user_course}]
-            course_filter = user_course
-            students = [{'student_id': user_id, 'name': session.get('user_name')}]
-        
-        # Build attendance report query
         query = """
-            SELECT a.*, s.name as student_name, s.course,
-                   CASE 
-                       WHEN a.marked_by_role = 'teacher' THEN t.name
-                       WHEN a.marked_by_role = 'admin' THEN ad.name
-                   END as marked_by_name
-            FROM attendance a
-            JOIN students s ON a.student_id = s.student_id
-            LEFT JOIN teachers t ON a.marked_by = t.teacher_id AND a.marked_by_role = 'teacher'
-            LEFT JOIN admin ad ON a.marked_by = ad.admin_id AND a.marked_by_role = 'admin'
+            SELECT s.*, 
+                   COUNT(DISTINCT a.attendance_id) as total_attendance,
+                   COUNT(DISTINCT CASE WHEN a.status = 'present' THEN a.attendance_id END) as present_count,
+                   AVG(cr.final_percentage) as avg_percentage
+            FROM students s
+            LEFT JOIN attendance a ON s.student_id = a.student_id
+            LEFT JOIN course_results cr ON s.student_id = cr.student_id
             WHERE 1=1
         """
-        
         params = []
         
-        if start_date:
-            query += " AND a.date >= ?"
-            params.append(start_date)
-        
-        if end_date:
-            query += " AND a.date <= ?"
-            params.append(end_date)
-        
-        if course_filter:
-            query += " AND a.course_name = ?"
-            params.append(course_filter)
-        
-        if student_filter:
-            query += " AND a.student_id = ?"
-            params.append(student_filter)
-        
-        if user_role == 'student':
-            query += " AND a.student_id = ?"
-            params.append(user_id)
-        
-        query += " ORDER BY a.date DESC, s.name"
-        
-        attendance_data = db.execute(query, *params)
-        
-    except Exception as e:
-        print(f"Error generating attendance report: {str(e)}")
-        flash("Error generating attendance report.")
-    
-    return render_template('attendance_report.html',
-                         courses=courses,
-                         students=students,
-                         attendance_data=attendance_data,
-                         start_date=start_date,
-                         end_date=end_date,
-                         course_filter=course_filter,
-                         student_filter=student_filter,
-                         user_role=user_role)
-
-# MODERN GRADING SYSTEM ROUTES
-@app.route('/assessments')
-@teacher_or_admin_required
-def assessments():
-    """Modern assessment management dashboard"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    try:
-        # Get courses based on user role
-        if user_role == 'teacher':
-            courses = db.execute("SELECT DISTINCT course_name FROM courses WHERE teacher_id = ?", user_id)
-        else:  # admin
-            courses = db.execute("SELECT DISTINCT course_name FROM courses")
-        
-        # Get recent assessments
-        if user_role == 'teacher':
-            recent_assessments = db.execute("""
-                SELECT a.*, t.name as teacher_name,
-                       COUNT(g.grade_id) as graded_count,
-                       (SELECT COUNT(*) FROM students s WHERE s.course = a.course_name AND s.status = 1) as total_students
-                FROM assessments a
-                LEFT JOIN teachers t ON a.teacher_id = t.teacher_id
-                LEFT JOIN grades g ON a.assessment_id = g.assessment_id
-                WHERE a.status = 'active' AND a.teacher_id = ?
-                GROUP BY a.assessment_id
-                ORDER BY a.created_at DESC
-                LIMIT 10
-            """, user_id)
-        else:
-            recent_assessments = db.execute("""
-                SELECT a.*, t.name as teacher_name,
-                       COUNT(g.grade_id) as graded_count,
-                       (SELECT COUNT(*) FROM students s WHERE s.course = a.course_name AND s.status = 1) as total_students
-                FROM assessments a
-                LEFT JOIN teachers t ON a.teacher_id = t.teacher_id
-                LEFT JOIN grades g ON a.assessment_id = g.assessment_id
-                WHERE a.status = 'active'
-                GROUP BY a.assessment_id
-                ORDER BY a.created_at DESC
-                LIMIT 10
-            """)
-        
-    except Exception as e:
-        print(f"Error loading assessments: {str(e)}")
-        courses = []
-        recent_assessments = []
-    
-    return render_template('assessments.html',
-                         courses=courses,
-                         recent_assessments=recent_assessments,
-                         user_role=user_role)
-
-@app.route('/create_assessment')
-@teacher_or_admin_required
-def create_assessment():
-    """Create new assessment"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    try:
-        if user_role == 'teacher':
-            courses = db.execute("SELECT DISTINCT course_name FROM courses WHERE teacher_id = ?", user_id)
-        else:
-            courses = db.execute("SELECT DISTINCT course_name FROM courses")
-    except:
-        courses = []
-    
-    assessment_types = ['Quiz', 'Assignment', 'Midterm', 'Final Exam', 'Project', 'Presentation', 'Lab Work']
-    
-    return render_template('create_assessment.html',
-                         courses=courses,
-                         assessment_types=assessment_types)
-
-@app.route('/create_assessment', methods=['POST'])
-@teacher_or_admin_required
-def create_assessment_post():
-    """Handle assessment creation"""
-    try:
-        course_name = request.form.get('course_name')
-        assessment_name = request.form.get('assessment_name')
-        assessment_type = request.form.get('assessment_type')
-        total_marks = int(request.form.get('total_marks'))
-        weightage = float(request.form.get('weightage'))
-        assessment_date = request.form.get('assessment_date')
-        description = request.form.get('description', '')
-        teacher_id = session.get("user_id")
-        
-        if not all([course_name, assessment_name, assessment_type, total_marks, weightage, assessment_date]):
-            flash("All required fields must be filled")
-            return redirect(url_for('create_assessment'))
-        
-        if total_marks <= 0 or weightage <= 0:
-            flash("Total marks and weightage must be positive")
-            return redirect(url_for('create_assessment'))
-        
-        # Create assessment
-        db.execute("""
-            INSERT INTO assessments (course_name, teacher_id, assessment_name, assessment_type, 
-                                   total_marks, weightage, assessment_date, description)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, course_name, teacher_id, assessment_name, assessment_type, 
-             total_marks, weightage, assessment_date, description)
-        
-        flash("Assessment created successfully!")
-        return redirect(url_for('assessments'))
-        
-    except Exception as e:
-        print(f"Error creating assessment: {str(e)}")
-        flash("Error creating assessment")
-        return redirect(url_for('create_assessment'))
-
-@app.route('/grade_assessment/<int:assessment_id>')
-@teacher_or_admin_required
-def grade_assessment(assessment_id):
-    """Grade students for a specific assessment"""
-    try:
-        # Get assessment details
-        assessment = db.execute("SELECT * FROM assessments WHERE assessment_id = ?", assessment_id)[0]
-        
-        # Get students enrolled in the course
-        students = db.execute("""
-            SELECT s.student_id, s.name, s.email
-            FROM students s
-            WHERE s.course = ? AND s.status = 1
-            ORDER BY s.name
-        """, assessment['course_name'])
-        
-        # Get existing grades for this assessment
-        existing_grades = db.execute("""
-            SELECT * FROM grades WHERE assessment_id = ?
-        """, assessment_id)
-        
-        # Create a mapping for easy lookup
-        grade_map = {grade['student_id']: grade for grade in existing_grades}
-        
-    except Exception as e:
-        print(f"Error loading assessment: {str(e)}")
-        flash("Error loading assessment")
-        return redirect(url_for('assessments'))
-    
-    return render_template('grade_assessment.html',
-                         assessment=assessment,
-                         students=students,
-                         grade_map=grade_map)
-
-@app.route('/submit_grades', methods=['POST'])
-@teacher_or_admin_required
-def submit_grades():
-    """Submit grades for multiple students"""
-    try:
-        assessment_id = int(request.form.get('assessment_id'))
-        
-        # Get assessment details
-        assessment = db.execute("SELECT * FROM assessments WHERE assessment_id = ?", assessment_id)[0]
-        total_marks = assessment['total_marks']
-        
-        # Process each student's grade
-        for key, value in request.form.items():
-            if key.startswith('marks_'):
-                student_id = int(key.split('_')[1])
-                obtained_marks = float(value) if value else 0
-                
-                if obtained_marks > total_marks:
-                    flash(f"Marks cannot exceed {total_marks} for student ID {student_id}")
-                    continue
-                
-                percentage = (obtained_marks / total_marks) * 100
-                remarks = request.form.get(f'remarks_{student_id}', '')
-                
-                # Insert or update grade
-                db.execute("""
-                    INSERT OR REPLACE INTO grades 
-                    (assessment_id, student_id, obtained_marks, percentage, remarks)
-                    VALUES (?, ?, ?, ?, ?)
-                """, assessment_id, student_id, obtained_marks, percentage, remarks)
-                
-                # Update course result
-                update_course_result(student_id, assessment['course_name'])
-        
-        flash("Grades submitted successfully!")
-        return redirect(url_for('assessments'))
-        
-    except Exception as e:
-        print(f"Error submitting grades: {str(e)}")
-        flash("Error submitting grades")
-        return redirect(url_for('assessments'))
-
-@app.route('/results')
-@login_required
-def results():
-    """View results based on user role"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    if user_role == 'student':
-        return redirect(url_for('student_results'))
-    else:
-        return redirect(url_for('all_student_results'))
-
-@app.route('/student_results')
-@login_required
-def student_results():
-    """View results for a specific student"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    # Get student ID based on role
-    if user_role == 'student':
-        student_id = user_id
-        student_info = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)[0]
-    else:
-        student_id = request.args.get('student_id')
-        if not student_id:
-            flash("Please select a student to view results")
-            return redirect(url_for('all_student_results'))
-        student_info = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)[0]
-    
-    try:
-        # Get course results
-        course_results = db.execute("""
-            SELECT * FROM course_results WHERE student_id = ?
-        """, student_id)
-        
-        # Get detailed assessment breakdown
-        assessment_breakdown = db.execute("""
-            SELECT a.assessment_name, a.assessment_type, a.total_marks, a.weightage,
-                   g.obtained_marks, g.percentage, a.course_name, a.assessment_date
-            FROM assessments a
-            JOIN grades g ON a.assessment_id = g.assessment_id
-            WHERE g.student_id = ?
-            ORDER BY a.course_name, a.assessment_date
-        """, student_id)
-        
-        # Organize data for display
-        course_data = {}
-        for result in course_results:
-            course_name = result['course_name']
-            course_data[course_name] = {
-                'result': result,
-                'assessments': []
-            }
-        
-        for assessment in assessment_breakdown:
-            course_name = assessment['course_name']
-            if course_name in course_data:
-                course_data[course_name]['assessments'].append(assessment)
-        
-    except Exception as e:
-        print(f"Error loading student results: {str(e)}")
-        course_results = []
-        course_data = {}
-    
-    return render_template('student_results.html',
-                         student_info=student_info,
-                         course_results=course_results,
-                         course_data=course_data,
-                         user_role=user_role)
-
-@app.route('/all_student_results')
-@teacher_or_admin_required
-def all_student_results():
-    """View all students' results summary"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    # Filter parameters
-    course_filter = request.args.get('course', '')
-    grade_filter = request.args.get('grade', '')
-    
-    try:
-        # Base query for students
-        query = """
-            SELECT DISTINCT s.student_id, s.name, s.course, s.email
-            FROM students s
-            WHERE s.status = 1
-        """
-        params = []
-        
-        # Filter by course if specified
         if course_filter:
             query += " AND s.course = ?"
             params.append(course_filter)
         
-        students = db.execute(query + " ORDER BY s.name", *params)
+        if status_filter:
+            if status_filter == 'active':
+                query += " AND s.status = 1"
+            elif status_filter == 'pending':
+                query += " AND s.status = 0"
         
-        # Get performance summary for each student
-        student_performance = []
+        if fee_filter:
+            query += " AND s.fee_status = ?"
+            params.append(fee_filter)
+        
+        if search_query:
+            query += " AND (s.name LIKE ? OR s.email LIKE ?)"
+            params.extend([f"%{search_query}%", f"%{search_query}%"])
+        
+        query += " GROUP BY s.student_id ORDER BY s.name"
+        
+        students = db.execute(query, *params)
+        
         for student in students:
-            # Get overall performance from course results
-            course_results = db.execute("""
-                SELECT AVG(final_percentage) as avg_percentage, COUNT(*) as total_courses
-                FROM course_results WHERE student_id = ?
-            """, student['student_id'])
-            
-            if course_results[0]['avg_percentage']:
-                avg_percentage = round(course_results[0]['avg_percentage'], 2)
-                final_grade = calculate_grade(avg_percentage)
-                status = 'Pass' if avg_percentage >= 50 else 'Fail'
+            if student['total_attendance'] > 0:
+                student['attendance_percentage'] = round((student['present_count'] / student['total_attendance']) * 100, 1)
             else:
-                avg_percentage = 0
-                final_grade = 'N/A'
-                status = 'No Grades'
+                student['attendance_percentage'] = 0
             
-            performance = {
-                'student_info': student,
-                'avg_percentage': avg_percentage,
-                'final_grade': final_grade,
-                'total_courses': course_results[0]['total_courses'],
-                'status': status
-            }
-            
-            # Apply grade filter
-            if grade_filter and performance['final_grade'] != grade_filter:
-                continue
-                
-            student_performance.append(performance)
+            student['avg_percentage'] = round(student['avg_percentage'], 1) if student['avg_percentage'] else 0
         
-        # Get available courses and grades for filtering
-        courses = db.execute("SELECT DISTINCT course_name FROM courses")
-        grades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D', 'F']
+        courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
         
     except Exception as e:
-        print(f"Error loading student results: {str(e)}")
-        flash("Error loading student results")
-        student_performance = []
+        print(f"Error loading students: {str(e)}")
+        flash("Error loading student data.")
+        students = []
         courses = []
-        grades = []
     
-    return render_template('all_student_results.html',
-                         student_performance=student_performance,
+    return render_template('manage_students.html',
+                         students=students,
                          courses=courses,
-                         grades=grades,
                          course_filter=course_filter,
-                         grade_filter=grade_filter,
+                         status_filter=status_filter,
+                         search_query=search_query,
+                         fee_filter=fee_filter,
                          user_role=user_role)
 
-# Continue with existing routes (pending_accounts, create_notification, etc.)
+@app.route('/manage_courses')
+@admin_required
+def manage_courses():
+    """Manage courses (Admin only)"""
+    try:
+        courses = db.execute("""
+            SELECT c.*, t.name as teacher_name, COUNT(s.student_id) as student_count
+            FROM courses c
+            LEFT JOIN teachers t ON c.teacher_id = t.teacher_id
+            LEFT JOIN students s ON c.course_name = s.course
+            GROUP BY c.course_id
+            ORDER BY c.course_name
+        """)
+        
+        teachers = db.execute("SELECT teacher_id, name FROM teachers WHERE status = 1")
+    except:
+        courses = []
+        teachers = []
+    
+    return render_template('manage_courses.html', courses=courses, teachers=teachers)
+
+@app.route('/manage_teachers')
+@admin_required
+def manage_teachers():
+    """Manage teachers (Admin only)"""
+    try:
+        teachers = db.execute("""
+            SELECT t.*, COUNT(c.course_id) as course_count
+            FROM teachers t
+            LEFT JOIN courses c ON t.teacher_id = c.teacher_id
+            WHERE t.status = 1
+            GROUP BY t.teacher_id
+            ORDER BY t.name
+        """)
+    except:
+        teachers = []
+    
+    return render_template('manage_teachers.html', teachers=teachers)
+
+
+@app.route('/toggle_student_status/<int:student_id>', methods=['POST'])
+@teacher_or_admin_required
+def toggle_student_status(student_id):
+    """Toggle student status between active (1) and inactive (0)"""
+    try:
+        # Get current student status
+        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
+        
+        if not student:
+            flash("Student not found.")
+            return redirect(url_for('manage_students'))
+        
+        current_status = student[0]['status']
+        student_name = student[0]['name']
+        
+        # Toggle status: 1 -> 0 (deactivate), 0 -> 1 (activate)
+        new_status = 0 if current_status == 1 else 1
+        
+        # Update student status in database
+        db.execute("UPDATE students SET status = ? WHERE student_id = ?", new_status, student_id)
+        
+        # Show appropriate success message
+        if new_status == 1:
+            flash(f"Student {student_name} has been activated successfully!")
+        else:
+            flash(f"Student {student_name} has been deactivated successfully!")
+        
+    except Exception as e:
+        print(f"Error toggling student status: {str(e)}")
+        flash("Error updating student status. Please try again.")
+    
+    return redirect(url_for('manage_students'))
+
+
+@app.route('/toggle_teacher_status/<int:teacher_id>', methods=['POST'])
+@admin_required
+def toggle_teacher_status(teacher_id):
+    """Toggle teacher status between active (1) and inactive (0)"""
+    try:
+        # Get current teacher status
+        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
+        
+        if not teacher:
+            flash("Teacher not found.")
+            return redirect(url_for('manage_teachers'))
+        
+        current_status = teacher[0]['status']
+        teacher_name = teacher[0]['name']
+        
+        # Toggle status: 1 -> 0 (deactivate), 0 -> 1 (activate)
+        new_status = 0 if current_status == 1 else 1
+        
+        # Update teacher status in database
+        db.execute("UPDATE teachers SET status = ? WHERE teacher_id = ?", new_status, teacher_id)
+        
+        # Show appropriate success message
+        if new_status == 1:
+            flash(f"Teacher {teacher_name} has been activated successfully!")
+        else:
+            flash(f"Teacher {teacher_name} has been deactivated successfully!")
+        
+    except Exception as e:
+        print(f"Error toggling teacher status: {str(e)}")
+        flash("Error updating teacher status. Please try again.")
+    
+    return redirect(url_for('manage_teachers'))
+
+@app.route('/delete_student/<int:student_id>', methods=['POST'])
+@admin_required
+def delete_student(student_id):
+    """Delete a student (Admin only)"""
+    try:
+        # Check if student exists
+        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
+        if not student:
+            flash("Student not found.")
+            return redirect(url_for('manage_students'))
+        
+        student_name = student[0]['name']
+        
+        # Check if student has attendance records
+        attendance_records = db.execute("SELECT COUNT(*) as count FROM attendance WHERE student_id = ?", student_id)
+        if attendance_records[0]['count'] > 0:
+            flash("Cannot delete student with attendance records. Please deactivate instead.")
+            return redirect(url_for('manage_students'))
+        
+        # Check if student has grades
+        grade_records = db.execute("SELECT COUNT(*) as count FROM grades WHERE student_id = ?", student_id)
+        if grade_records[0]['count'] > 0:
+            flash("Cannot delete student with assessment results. Please deactivate instead.")
+            return redirect(url_for('manage_students'))
+        
+        # Delete the student
+        db.execute("DELETE FROM students WHERE student_id = ?", student_id)
+        
+        flash(f"Student {student_name} deleted successfully!")
+        
+    except Exception as e:
+        print(f"Error deleting student: {str(e)}")
+        flash("Error deleting student.")
+    
+    return redirect(url_for('manage_students'))
+
+@app.route('/delete_teacher/<int:teacher_id>', methods=['POST'])
+@admin_required
+def delete_teacher(teacher_id):
+    """Delete a teacher (Admin only)"""
+    try:
+        # Check if teacher exists
+        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
+        if not teacher:
+            flash("Teacher not found.")
+            return redirect(url_for('manage_teachers'))
+        
+        teacher_name = teacher[0]['name']
+        
+        # Check if teacher has assigned courses
+        assigned_courses = db.execute("SELECT COUNT(*) as count FROM courses WHERE teacher_id = ?", teacher_id)
+        if assigned_courses[0]['count'] > 0:
+            flash("Cannot delete teacher with assigned courses. Please reassign courses first.")
+            return redirect(url_for('manage_teachers'))
+        
+        # Check if teacher has created assessments
+        created_assessments = db.execute("SELECT COUNT(*) as count FROM assessments WHERE teacher_id = ?", teacher_id)
+        if created_assessments[0]['count'] > 0:
+            flash("Cannot delete teacher with created assessments. Please reassign assessments first.")
+            return redirect(url_for('manage_teachers'))
+        
+        # Delete the teacher
+        db.execute("DELETE FROM teachers WHERE teacher_id = ?", teacher_id)
+        
+        flash(f"Teacher {teacher_name} deleted successfully!")
+        
+    except Exception as e:
+        print(f"Error deleting teacher: {str(e)}")
+        flash("Error deleting teacher.")
+    
+    return redirect(url_for('manage_teachers'))
+
+
+
+
 @app.route('/pending_accounts')
 @teacher_or_admin_required
 def pending_accounts():
@@ -1492,797 +2146,26 @@ def mark_all_read():
         flash("Error updating notifications.")
         return redirect(url_for('dashboard'))
 
-# STUDENT AND TEACHER MANAGEMENT ROUTES
-@app.route('/manage_students')
-@teacher_or_admin_required
-def manage_students():
-    """Manage all students with detailed view"""
-    user_role = session.get("user_role")
-    user_id = session.get("user_id")
-    
-    # Filter parameters
-    course_filter = request.args.get('course', '')
-    status_filter = request.args.get('status', '')
-    search_query = request.args.get('search', '')
-    
-    try:
-        # Base query for students
-        query = """
-            SELECT s.*, 
-                   COUNT(DISTINCT a.attendance_id) as total_attendance,
-                   COUNT(DISTINCT CASE WHEN a.status = 'present' THEN a.attendance_id END) as present_count,
-                   AVG(cr.final_percentage) as avg_percentage
-            FROM students s
-            LEFT JOIN attendance a ON s.student_id = a.student_id
-            LEFT JOIN course_results cr ON s.student_id = cr.student_id
-            WHERE 1=1
-        """
-        params = []
-        
-        # Apply filters
-        if course_filter:
-            query += " AND s.course = ?"
-            params.append(course_filter)
-        
-        if status_filter:
-            if status_filter == 'active':
-                query += " AND s.status = 1"
-            elif status_filter == 'pending':
-                query += " AND s.status = 0"
-        
-        if search_query:
-            query += " AND (s.name LIKE ? OR s.email LIKE ?)"
-            params.extend([f"%{search_query}%", f"%{search_query}%"])
-        
-        query += " GROUP BY s.student_id ORDER BY s.name"
-        
-        students = db.execute(query, *params)
-        
-        # Calculate attendance percentage for each student
-        for student in students:
-            if student['total_attendance'] > 0:
-                student['attendance_percentage'] = round((student['present_count'] / student['total_attendance']) * 100, 1)
-            else:
-                student['attendance_percentage'] = 0
-            
-            student['avg_percentage'] = round(student['avg_percentage'], 1) if student['avg_percentage'] else 0
-        
-        # Get available courses for filter
-        courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
-        
-    except Exception as e:
-        print(f"Error loading students: {str(e)}")
-        flash("Error loading student data.")
-        students = []
-        courses = []
-    
-    return render_template('manage_students.html',
-                         students=students,
-                         courses=courses,
-                         course_filter=course_filter,
-                         status_filter=status_filter,
-                         search_query=search_query,
-                         user_role=user_role)
-
-@app.route('/manage_teachers')
-@admin_required
-def manage_teachers():
-    """Manage all teachers with detailed view (Admin only)"""
-    # Filter parameters
-    subject_filter = request.args.get('subject', '')
-    status_filter = request.args.get('status', '')
-    search_query = request.args.get('search', '')
-    
-    try:
-        # Base query for teachers
-        query = """
-            SELECT t.*, 
-                   COUNT(DISTINCT c.course_id) as assigned_courses,
-                   COUNT(DISTINCT a.assessment_id) as total_assessments
-            FROM teachers t
-            LEFT JOIN courses c ON t.teacher_id = c.teacher_id
-            LEFT JOIN assessments a ON t.teacher_id = a.teacher_id
-            WHERE 1=1
-        """
-        params = []
-        
-        # Apply filters
-        if subject_filter:
-            query += " AND t.subject LIKE ?"
-            params.append(f"%{subject_filter}%")
-        
-        if status_filter:
-            if status_filter == 'active':
-                query += " AND t.status = 1"
-            elif status_filter == 'pending':
-                query += " AND t.status = 0"
-        
-        if search_query:
-            query += " AND (t.name LIKE ? OR t.email LIKE ? OR t.subject LIKE ?)"
-            params.extend([f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"])
-        
-        query += " GROUP BY t.teacher_id ORDER BY t.name"
-        
-        teachers = db.execute(query, *params)
-        
-        # Get unique subjects for filter
-        subjects = db.execute("SELECT DISTINCT subject FROM teachers WHERE subject IS NOT NULL ORDER BY subject")
-        
-    except Exception as e:
-        print(f"Error loading teachers: {str(e)}")
-        flash("Error loading teacher data.")
-        teachers = []
-        subjects = []
-    
-    return render_template('manage_teachers.html',
-                         teachers=teachers,
-                         subjects=subjects,
-                         subject_filter=subject_filter,
-                         status_filter=status_filter,
-                         search_query=search_query)
-
-@app.route('/student_details/<int:student_id>')
-@teacher_or_admin_required
-def student_details(student_id):
-    """View detailed information about a specific student"""
-    user_role = session.get('user_role')
-    
-    try:
-        # Get student basic info
-        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
-        if not student:
-            flash("Student not found.")
-            return redirect(url_for('manage_students'))
-        
-        student = student[0]
-        
-        # Get attendance data
-        attendance_data = db.execute("""
-            SELECT a.*, 
-                   CASE 
-                       WHEN a.marked_by_role = 'teacher' THEN t.name
-                       WHEN a.marked_by_role = 'admin' THEN ad.name
-                   END as marked_by_name
-            FROM attendance a
-            LEFT JOIN teachers t ON a.marked_by = t.teacher_id AND a.marked_by_role = 'teacher'
-            LEFT JOIN admin ad ON a.marked_by = ad.admin_id AND a.marked_by_role = 'admin'
-            WHERE a.student_id = ?
-            ORDER BY a.date DESC
-            LIMIT 20
-        """, student_id)
-        
-        # Calculate attendance statistics
-        total_attendance = len(attendance_data)
-        present_count = len([a for a in attendance_data if a['status'] == 'present'])
-        attendance_percentage = round((present_count / total_attendance) * 100, 1) if total_attendance > 0 else 0
-        
-        # Get course results
-        course_results = db.execute("""
-            SELECT * FROM course_results WHERE student_id = ?
-        """, student_id)
-        
-        # Get assessment details
-        assessment_details = db.execute("""
-            SELECT a.assessment_name, a.assessment_type, a.total_marks, a.weightage,
-                   g.obtained_marks, g.percentage, a.course_name, a.assessment_date,
-                   g.remarks
-            FROM assessments a
-            JOIN grades g ON a.assessment_id = g.assessment_id
-            WHERE g.student_id = ?
-            ORDER BY a.assessment_date DESC
-        """, student_id)
-        
-        # Calculate overall statistics
-        overall_avg = 0
-        if course_results:
-            total_percentage = sum([cr['final_percentage'] for cr in course_results if cr['final_percentage']])
-            overall_avg = round(total_percentage / len(course_results), 1) if course_results else 0
-        
-        stats = {
-            'total_attendance': total_attendance,
-            'present_count': present_count,
-            'attendance_percentage': attendance_percentage,
-            'total_courses': len(course_results),
-            'overall_avg': overall_avg,
-            'total_assessments': len(assessment_details)
-        }
-        
-    except Exception as e:
-        print(f"Error loading student details: {str(e)}")
-        flash("Error loading student details.")
-        return redirect(url_for('manage_students'))
-    
-    return render_template('student_details.html',
-                         student=student,
-                         attendance_data=attendance_data,
-                         course_results=course_results,
-                         assessment_details=assessment_details,
-                         stats=stats,
-                         user_role=user_role)
-
-@app.route('/toggle_student_status/<int:student_id>', methods=['POST'])
-@teacher_or_admin_required
-def toggle_student_status(student_id):
-    """Toggle student status between active (1) and inactive (0)"""
-    try:
-        # Get current student status
-        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
-        
-        if not student:
-            flash("Student not found.")
-            return redirect(url_for('manage_students'))
-        
-        current_status = student[0]['status']
-        student_name = student[0]['name']
-        
-        # Toggle status: 1 -> 0 (deactivate), 0 -> 1 (activate)
-        new_status = 0 if current_status == 1 else 1
-        
-        # Update student status in database
-        db.execute("UPDATE students SET status = ? WHERE student_id = ?", new_status, student_id)
-        
-        # Show appropriate success message
-        if new_status == 1:
-            flash(f"Student {student_name} has been activated successfully!")
-        else:
-            flash(f"Student {student_name} has been deactivated successfully!")
-        
-    except Exception as e:
-        print(f"Error toggling student status: {str(e)}")
-        flash("Error updating student status. Please try again.")
-    
-    return redirect(url_for('manage_students'))
-
-@app.route('/toggle_teacher_status/<int:teacher_id>', methods=['POST'])
-@admin_required
-def toggle_teacher_status(teacher_id):
-    """Toggle teacher status between active (1) and inactive (0)"""
-    try:
-        # Get current teacher status
-        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
-        
-        if not teacher:
-            flash("Teacher not found.")
-            return redirect(url_for('manage_teachers'))
-        
-        current_status = teacher[0]['status']
-        teacher_name = teacher[0]['name']
-        
-        # Toggle status: 1 -> 0 (deactivate), 0 -> 1 (activate)
-        new_status = 0 if current_status == 1 else 1
-        
-        # Update teacher status in database
-        db.execute("UPDATE teachers SET status = ? WHERE teacher_id = ?", new_status, teacher_id)
-        
-        # Show appropriate success message
-        if new_status == 1:
-            flash(f"Teacher {teacher_name} has been activated successfully!")
-        else:
-            flash(f"Teacher {teacher_name} has been deactivated successfully!")
-        
-    except Exception as e:
-        print(f"Error toggling teacher status: {str(e)}")
-        flash("Error updating teacher status. Please try again.")
-    
-    return redirect(url_for('manage_teachers'))
-
-@app.route('/delete_student/<int:student_id>', methods=['POST'])
-@admin_required
-def delete_student(student_id):
-    """Delete a student (Admin only)"""
-    try:
-        # Check if student exists
-        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
-        if not student:
-            flash("Student not found.")
-            return redirect(url_for('manage_students'))
-        
-        student_name = student[0]['name']
-        
-        # Check if student has attendance records
-        attendance_records = db.execute("SELECT COUNT(*) as count FROM attendance WHERE student_id = ?", student_id)
-        if attendance_records[0]['count'] > 0:
-            flash("Cannot delete student with attendance records. Please deactivate instead.")
-            return redirect(url_for('manage_students'))
-        
-        # Check if student has grades
-        grade_records = db.execute("SELECT COUNT(*) as count FROM grades WHERE student_id = ?", student_id)
-        if grade_records[0]['count'] > 0:
-            flash("Cannot delete student with assessment results. Please deactivate instead.")
-            return redirect(url_for('manage_students'))
-        
-        # Delete the student
-        db.execute("DELETE FROM students WHERE student_id = ?", student_id)
-        
-        flash(f"Student {student_name} deleted successfully!")
-        
-    except Exception as e:
-        print(f"Error deleting student: {str(e)}")
-        flash("Error deleting student.")
-    
-    return redirect(url_for('manage_students'))
-
-@app.route('/delete_teacher/<int:teacher_id>', methods=['POST'])
-@admin_required
-def delete_teacher(teacher_id):
-    """Delete a teacher (Admin only)"""
-    try:
-        # Check if teacher exists
-        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
-        if not teacher:
-            flash("Teacher not found.")
-            return redirect(url_for('manage_teachers'))
-        
-        teacher_name = teacher[0]['name']
-        
-        # Check if teacher has assigned courses
-        assigned_courses = db.execute("SELECT COUNT(*) as count FROM courses WHERE teacher_id = ?", teacher_id)
-        if assigned_courses[0]['count'] > 0:
-            flash("Cannot delete teacher with assigned courses. Please reassign courses first.")
-            return redirect(url_for('manage_teachers'))
-        
-        # Check if teacher has created assessments
-        created_assessments = db.execute("SELECT COUNT(*) as count FROM assessments WHERE teacher_id = ?", teacher_id)
-        if created_assessments[0]['count'] > 0:
-            flash("Cannot delete teacher with created assessments. Please reassign assessments first.")
-            return redirect(url_for('manage_teachers'))
-        
-        # Delete the teacher
-        db.execute("DELETE FROM teachers WHERE teacher_id = ?", teacher_id)
-        
-        flash(f"Teacher {teacher_name} deleted successfully!")
-        
-    except Exception as e:
-        print(f"Error deleting teacher: {str(e)}")
-        flash("Error deleting teacher.")
-    
-    return redirect(url_for('manage_teachers'))
-
-@app.route('/edit_student/<int:student_id>')
-@teacher_or_admin_required
-def edit_student(student_id):
-    """Edit student information form"""
-    try:
-        student = db.execute("SELECT * FROM students WHERE student_id = ?", student_id)
-        if not student:
-            flash("Student not found.")
-            return redirect(url_for('manage_students'))
-        
-        student = student[0]
-        courses = db.execute("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
-        
-    except Exception as e:
-        print(f"Error loading student: {str(e)}")
-        flash("Error loading student.")
-        return redirect(url_for('manage_students'))
-    
-    return render_template('edit_student.html', student=student, courses=courses)
-
-@app.route('/update_student/<int:student_id>', methods=['POST'])
-@teacher_or_admin_required
-def update_student(student_id):
-    """Update student information"""
-    try:
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip()
-        phone = request.form.get('phone', '').strip()
-        course = request.form.get('course', '').strip()
-        dob = request.form.get('dob', '')
-        gender = request.form.get('gender', '')
-        parent_name = request.form.get('parent_name', '').strip()
-        parent_phone = request.form.get('parent_phone', '').strip()
-        parent_email = request.form.get('parent_email', '').strip()
-        parent_occupation = request.form.get('parent_occupation', '').strip()
-        emergency_contact = request.form.get('emergency_contact', '').strip()
-        
-        # Validate required fields
-        if not all([name, email, phone, course]):
-            flash("Name, email, phone, and course are required.")
-            return redirect(url_for('edit_student', student_id=student_id))
-        
-        # Check if email exists for other students
-        existing = db.execute("SELECT * FROM students WHERE email = ? AND student_id != ?", email, student_id)
-        if existing:
-            flash("Email already exists for another student.")
-            return redirect(url_for('edit_student', student_id=student_id))
-        
-        # Update student
-        db.execute("""
-            UPDATE students 
-            SET name = ?, email = ?, phone = ?, course = ?, dob = ?, gender = ?,
-                parent_name = ?, parent_phone = ?, parent_email = ?, 
-                parent_occupation = ?, emergency_contact = ?
-            WHERE student_id = ?
-        """, name, email, phone, course, dob, gender, parent_name, parent_phone, 
-             parent_email, parent_occupation, emergency_contact, student_id)
-        
-        flash("Student information updated successfully!")
-        return redirect(url_for('student_details', student_id=student_id))
-        
-    except Exception as e:
-        print(f"Error updating student: {str(e)}")
-        flash("Error updating student.")
-        return redirect(url_for('edit_student', student_id=student_id))
-
-@app.route('/teacher_details/<int:teacher_id>')
-@admin_required
-def teacher_details(teacher_id):
-    """View detailed information about a specific teacher (Admin only)"""
-    try:
-        # Get teacher basic info
-        teacher = db.execute("SELECT * FROM teachers WHERE teacher_id = ?", teacher_id)
-        if not teacher:
-            flash("Teacher not found.")
-            return redirect(url_for('manage_teachers'))
-        
-        teacher = teacher[0]
-        
-        # Get assigned courses
-        assigned_courses = db.execute("""
-            SELECT * FROM courses WHERE teacher_id = ?
-        """, teacher_id)
-        
-        # Get created assessments
-        assessments = db.execute("""
-            SELECT a.*, COUNT(g.grade_id) as graded_count,
-                   (SELECT COUNT(*) FROM students s WHERE s.course = a.course_name AND s.status = 1) as total_students
-            FROM assessments a
-            LEFT JOIN grades g ON a.assessment_id = g.assessment_id
-            WHERE a.teacher_id = ?
-            GROUP BY a.assessment_id
-            ORDER BY a.created_at DESC
-        """, teacher_id)
-        
-        # Get students under this teacher (based on course assignment)
-        students_taught = []
-        if assigned_courses:
-            course_names = [course['course_name'] for course in assigned_courses]
-            placeholders = ','.join(['?' for _ in course_names])
-            students_taught = db.execute(f"""
-                SELECT DISTINCT s.student_id, s.name, s.email, s.course
-                FROM students s
-                WHERE s.course IN ({placeholders}) AND s.status = 1
-                ORDER BY s.name
-            """, *course_names)
-        
-        # Calculate statistics
-        total_students = len(students_taught)
-        total_assessments = len(assessments)
-        total_courses = len(assigned_courses)
-        
-        # Calculate grading progress
-        total_possible_grades = sum([a['total_students'] for a in assessments])
-        total_graded = sum([a['graded_count'] for a in assessments])
-        grading_percentage = round((total_graded / total_possible_grades) * 100, 1) if total_possible_grades > 0 else 0
-        
-        stats = {
-            'total_students': total_students,
-            'total_assessments': total_assessments,
-            'total_courses': total_courses,
-            'grading_percentage': grading_percentage,
-            'total_graded': total_graded,
-            'total_possible_grades': total_possible_grades
-        }
-        
-    except Exception as e:
-        print(f"Error loading teacher details: {str(e)}")
-        flash("Error loading teacher details.")
-        return redirect(url_for('manage_teachers'))
-    
-    return render_template('teacher_details.html',
-                         teacher=teacher,
-                         assigned_courses=assigned_courses,
-                         assessments=assessments,
-                         students_taught=students_taught,
-                         stats=stats)
-
-@app.route('/manage_courses')
-@admin_required
-def manage_courses():
-    """Manage all courses (Admin only)"""
-    try:
-        # Get courses with teacher and student information
-        courses = db.execute("""
-            SELECT c.*, 
-                   t.name as teacher_name,
-                   t.subject as teacher_subject,
-                   COUNT(DISTINCT s.student_id) as enrolled_students
-            FROM courses c
-            LEFT JOIN teachers t ON c.teacher_id = t.teacher_id
-            LEFT JOIN students s ON c.course_name = s.course AND s.status = 1
-            GROUP BY c.course_id
-            ORDER BY c.course_name
-        """)
-        
-        # Get all active teachers for assignment
-        teachers = db.execute("SELECT teacher_id, name, subject FROM teachers WHERE status = 1 ORDER BY name")
-        
-        # Calculate statistics
-        total_students = sum([course['enrolled_students'] for course in courses])
-        courses_with_teachers = len([course for course in courses if course['teacher_id']])
-        
-    except Exception as e:
-        print(f"Error loading courses: {str(e)}")
-        courses = []
-        teachers = []
-        total_students = 0
-        courses_with_teachers = 0
-    
-    return render_template('manage_courses.html',
-                         courses=courses,
-                         teachers=teachers,
-                         total_students=total_students,
-                         courses_with_teachers=courses_with_teachers,
-                         user_role=session.get('user_role'))
-
-@app.route('/add_course', methods=['POST'])
-@admin_required
-def add_course():
-    """Add a new course"""
-    try:
-        course_name = request.form.get('course_name', '').strip()
-        teacher_id = request.form.get('teacher_id', '')
-        fee = request.form.get('fee', '')
-        duration = request.form.get('duration', '').strip()
-        description = request.form.get('description', '').strip()
-        
-        if not course_name:
-            flash("Course name is required.")
-            return redirect(url_for('manage_courses'))
-        
-        # Check if course already exists
-        existing = db.execute("SELECT * FROM courses WHERE course_name = ?", course_name)
-        if existing:
-            flash("Course with this name already exists.")
-            return redirect(url_for('manage_courses'))
-        
-        # Convert fee to float if provided
-        fee_value = float(fee) if fee else None
-        teacher_id_value = int(teacher_id) if teacher_id else None
-        
-        # Insert new course
-        db.execute("""
-            INSERT INTO courses (course_name, teacher_id, fee, duration, description)
-            VALUES (?, ?, ?, ?, ?)
-        """, course_name, teacher_id_value, fee_value, duration, description)
-        
-        flash("Course added successfully!")
-        
-    except Exception as e:
-        print(f"Error adding course: {str(e)}")
-        flash("Error adding course. Please check your input.")
-    
-    return redirect(url_for('manage_courses'))
-
-@app.route('/assign_teacher/<int:course_id>', methods=['POST'])
-@admin_required
-def assign_teacher(course_id):
-    """Assign or unassign teacher to/from a course"""
-    try:
-        teacher_id = request.form.get('teacher_id', '')
-        
-        if teacher_id:
-            # Assign teacher
-            db.execute("UPDATE courses SET teacher_id = ? WHERE course_id = ?", int(teacher_id), course_id)
-            flash("Teacher assigned successfully!")
-        else:
-            # Unassign teacher
-            db.execute("UPDATE courses SET teacher_id = NULL WHERE course_id = ?", course_id)
-            flash("Teacher unassigned successfully!")
-        
-    except Exception as e:
-        print(f"Error assigning teacher: {str(e)}")
-        flash("Error assigning teacher.")
-    
-    return redirect(url_for('manage_courses'))
-
-@app.route('/delete_course/<int:course_id>', methods=['POST'])
-@admin_required
-def delete_course(course_id):
-    """Delete a course (Admin only)"""
-    try:
-        # Check if course exists
-        course = db.execute("SELECT * FROM courses WHERE course_id = ?", course_id)
-        if not course:
-            flash("Course not found.")
-            return redirect(url_for('manage_courses'))
-        
-        course_name = course[0]['course_name']
-        
-        # Check if there are students enrolled
-        enrolled_students = db.execute("SELECT COUNT(*) as count FROM students WHERE course = ?", course_name)
-        if enrolled_students[0]['count'] > 0:
-            flash("Cannot delete course with enrolled students. Please transfer students first.")
-            return redirect(url_for('manage_courses'))
-        
-        # Check if there are assessments
-        assessments = db.execute("SELECT COUNT(*) as count FROM assessments WHERE course_name = ?", course_name)
-        if assessments[0]['count'] > 0:
-            flash("Cannot delete course with existing assessments. Please remove assessments first.")
-            return redirect(url_for('manage_courses'))
-        
-        # Delete the course
-        db.execute("DELETE FROM courses WHERE course_id = ?", course_id)
-        
-        flash("Course deleted successfully!")
-        
-    except Exception as e:
-        print(f"Error deleting course: {str(e)}")
-        flash("Error deleting course.")
-    
-    return redirect(url_for('manage_courses'))
-
 @app.route('/logout')
 def logout():
     session.clear()
     flash("You have been logged out successfully.")
     return redirect(url_for('start'))
 
-# ERROR HANDLERS
-@app.errorhandler(403)
-def forbidden(error):
-    """Handle 403 Forbidden errors"""
-    return render_template('error.html',
-                         error_code=403,
-                         error_title="Access Forbidden",
-                         error_message="You don't have permission to access this resource. Please check your user role and permissions.",
-                         error_details=str(error) if app.debug else None), 403
 
 @app.errorhandler(404)
 def page_not_found(error):
-    """Handle 404 Not Found errors"""
     return render_template('error.html',
                          error_code=404,
                          error_title="Page Not Found",
-                         error_message="The page you're looking for doesn't exist. It may have been moved, deleted, or you entered the wrong URL.",
-                         error_details=str(error) if app.debug else None), 404
-
-@app.errorhandler(401)
-def unauthorized(error):
-    """Handle 401 Unauthorized errors"""
-    return render_template('error.html',
-                         error_code=401,
-                         error_title="Authentication Required",
-                         error_message="You need to log in to access this resource. Please log in with your credentials.",
-                         error_details=str(error) if app.debug else None), 401
+                         error_message="The page you're looking for doesn't exist."), 404
 
 @app.errorhandler(500)
 def internal_server_error(error):
-    """Handle 500 Internal Server errors"""
-    # Log the error for debugging
-    print(f"Internal Server Error: {str(error)}")
-    
-    # Rollback any database transactions
-    try:
-        db.execute("ROLLBACK")
-    except:
-        pass
-    
     return render_template('error.html',
                          error_code=500,
                          error_title="Internal Server Error",
-                         error_message="Something went wrong on our server. Our team has been notified and is working to fix the issue.",
-                         error_details=str(error) if app.debug else None), 500
-
-@app.errorhandler(400)
-def bad_request(error):
-    """Handle 400 Bad Request errors"""
-    return render_template('error.html',
-                         error_code=400,
-                         error_title="Bad Request",
-                         error_message="The request could not be understood by the server. Please check your input and try again.",
-                         error_details=str(error) if app.debug else None), 400
-
-@app.errorhandler(405)
-def method_not_allowed(error):
-    """Handle 405 Method Not Allowed errors"""
-    return render_template('error.html',
-                         error_code=405,
-                         error_title="Method Not Allowed",
-                         error_message="The method is not allowed for the requested URL. Please check the request method.",
-                         error_details=str(error) if app.debug else None), 405
-
-@app.errorhandler(Exception)
-def handle_exception(error):
-    """Handle any uncaught exceptions"""
-    # Log the error
-    print(f"Uncaught Exception: {str(error)}")
-    
-    # Check if it's an HTTP error
-    if hasattr(error, 'code'):
-        return render_template('error.html',
-                             error_code=error.code,
-                             error_title=error.name,
-                             error_message=error.description,
-                             error_details=str(error) if app.debug else None), error.code
-    
-    # For any other exception, return 500
-    return render_template('error.html',
-                         error_code=500,
-                         error_title="Unexpected Error",
-                         error_message="An unexpected error occurred. Please try again later or contact support if the problem persists.",
-                         error_details=str(error) if app.debug else None), 500
-
-# Enhanced login_required decorator with better error handling
-def login_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if session.get("user_id") is None:
-            # Store the URL they were trying to access
-            session['next_url'] = request.url
-            # Return 401 instead of redirect for better error handling
-            return render_template('error.html',
-                                 error_code=401,
-                                 error_title="Login Required",
-                                 error_message="Please log in to access this page.",
-                                 error_details=None), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Enhanced admin_required decorator
-def admin_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if session.get("user_id") is None:
-            return render_template('error.html',
-                                 error_code=401,
-                                 error_title="Login Required",
-                                 error_message="Please log in to access this page.",
-                                 error_details=None), 401
-        
-        if session.get("user_role") != 'admin':
-            return render_template('error.html',
-                                 error_code=403,
-                                 error_title="Admin Access Required",
-                                 error_message="You need administrator privileges to access this resource.",
-                                 error_details=None), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Enhanced teacher_or_admin_required decorator
-def teacher_or_admin_required(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if session.get("user_id") is None:
-            return render_template('error.html',
-                                 error_code=401,
-                                 error_title="Login Required",
-                                 error_message="Please log in to access this page.",
-                                 error_details=None), 401
-        
-        if session.get("user_role") not in ['admin', 'teacher']:
-            return render_template('error.html',
-                                 error_code=403,
-                                 error_title="Teacher/Admin Access Required",
-                                 error_message="You need teacher or administrator privileges to access this resource.",
-                                 error_details=None), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Enhanced can_send_messages decorator
-def can_send_messages(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if session.get("user_id") is None:
-            return render_template('error.html',
-                                 error_code=401,
-                                 error_title="Login Required",
-                                 error_message="Please log in to send messages.",
-                                 error_details=None), 401
-        
-        if session.get("user_role") not in ['admin', 'teacher', 'student']:
-            return render_template('error.html',
-                                 error_code=403,
-                                 error_title="Access Denied",
-                                 error_message="You don't have permission to send messages.",
-                                 error_details=None), 403
-        return f(*args, **kwargs)
-    return decorated_function
-
+                         error_message="Something went wrong on our server."), 500
 
 if __name__ == '__main__':
     app.run(debug=True)

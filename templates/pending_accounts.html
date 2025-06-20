@@ -39,25 +39,6 @@
                             <tbody>
                                 {% for student in pending_students %}
                                 <tr>
-                                    <!-- For Students Section - update the actions column -->
-                                    <td>
-                                        <div class="btn-group-vertical btn-group-sm">
-                                            <a href="{{ url_for('student_details', student_id=student.student_id) }}" 
-                                            class="btn btn-info btn-sm">
-                                                <i class="fas fa-eye me-1"></i>View Details
-                                            </a>
-                                            <form method="post" action="{{ url_for('approve_account', role='student', account_id=student.student_id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-success btn-sm w-100">
-                                                    <i class="fas fa-check me-1"></i>Approve
-                                                </button>
-                                            </form>
-                                            <form method="post" action="{{ url_for('reject_account', role='student', account_id=student.student_id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                    <i class="fas fa-times me-1"></i>Reject
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
                                     <td>
                                         <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
                                         <strong>{{ student.name }}</strong>
@@ -69,6 +50,11 @@
                                     <td>{{ student.dob }}</td>
                                     <td>{{ student.gender }}</td>
                                     <td>
+                                     <div class="btn-group-vertical btn-group-sm">
+                                            <a href="{{ url_for('student_details', student_id=student.student_id) }}" 
+                                            class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>
                                         <form method="post" action="{{ url_for('approve_account', role='student', account_id=student.student_id) }}" class="d-inline">
                                             <button type="submit" class="btn btn-success btn-sm me-1">
                                                 <i class="fas fa-check me-1"></i>Approve
@@ -117,24 +103,6 @@
                                 {% for teacher in pending_teachers %}
                                 <tr>
                                     <td>
-                                        <div class="btn-group-vertical btn-group-sm">
-                                            <a href="{{ url_for('teacher_details', teacher_id=teacher.teacher_id) }}" 
-                                            class="btn btn-info btn-sm">
-                                                <i class="fas fa-eye me-1"></i>View Details
-                                            </a>
-                                            <form method="post" action="{{ url_for('approve_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-success btn-sm w-100">
-                                                    <i class="fas fa-check me-1"></i>Approve
-                                                </button>
-                                            </form>
-                                            <form method="post" action="{{ url_for('reject_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
-                                                <button type="submit" class="btn btn-danger btn-sm w-100">
-                                                    <i class="fas fa-times me-1"></i>Reject
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                    <td>
                                         <i class="fas fa-user-tie fa-lg text-success me-2"></i>
                                         <strong>{{ teacher.name }}</strong>
                                     </td>
@@ -144,6 +112,11 @@
                                     </td>
                                     <td>{{ teacher.phone }}</td>
                                     <td>
+                                        <div class="btn-group-vertical btn-group-sm">
+                                            <a href="{{ url_for('teacher_details', teacher_id=teacher.teacher_id) }}" 
+                                            class="btn btn-info btn-sm">
+                                                <i class="fas fa-eye me-1"></i>View Details
+                                            </a>
                                         <form method="post" action="{{ url_for('approve_account', role='teacher', account_id=teacher.teacher_id) }}" class="d-inline">
                                             <button type="submit" class="btn btn-success btn-sm me-1">
                                                 <i class="fas fa-check me-1"></i>Approve

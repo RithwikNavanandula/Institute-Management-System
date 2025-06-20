@@ -1,465 +1,209 @@
 {% extends "layout.html" %}
 
-{% block title %}Dashboard - Institute Management System{% endblock %}
+{% block title %}Dashboard{% endblock %}
 
 {% block main %}
-<div class="container-fluid">
-    <!-- Welcome Section -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="welcome-card">
-                <h2><i class="fas fa-tachometer-alt me-2"></i>Welcome back, {{ name }}!</h2>
-                <p class="text-muted">{{ role.title() }} Dashboard - {{ current_date }}</p>
-            </div>
+<div class="row mb-4">
+    <div class="col-12">
+        <h2>Welcome back, {{ name }}!</h2>
+        <p class="text-muted">Here's what's happening in your institute today.</p>
+    </div>
+</div>
+
+<!-- Role-based Statistics -->
+{% if role == 'admin' %}
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.total_students or 0 }}</div>
+            <div class="stats-label">Total Students</div>
+            <i class="fas fa-users stats-icon"></i>
         </div>
     </div>
-
-    <!-- Statistics Cards -->
-    <div class="row mb-4">
-        {% if role == 'admin' %}
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-primary">
-                <div class="stats-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.total_students or 0 }}</h3>
-                    <p>Total Students</p>
-                </div>
-            </div>
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.total_teachers or 0 }}</div>
+            <div class="stats-label">Total Teachers</div>
+            <i class="fas fa-chalkboard-teacher stats-icon"></i>
         </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-success">
-                <div class="stats-icon">
-                    <i class="fas fa-chalkboard-teacher"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.total_teachers or 0 }}</h3>
-                    <p>Total Teachers</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-info">
-                <div class="stats-icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.total_courses or 0 }}</h3>
-                    <p>Total Courses</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-warning">
-                <div class="stats-icon">
-                    <i class="fas fa-user-clock"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.pending_approvals or 0 }}</h3>
-                    <p>Pending Approvals</p>
-                </div>
-            </div>
-        </div>
-        
-        {% elif role == 'teacher' %}
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-primary">
-                <div class="stats-icon">
-                    <i class="fas fa-users"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.my_students or 0 }}</h3>
-                    <p>My Students</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-success">
-                <div class="stats-icon">
-                    <i class="fas fa-book"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.my_courses or 0 }}</h3>
-                    <p>My Courses</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-info">
-                <div class="stats-icon">
-                    <i class="fas fa-tasks"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.assessments or 0 }}</h3>
-                    <p>Assessments</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-3 col-md-6 mb-3">
-            <div class="stats-card bg-warning">
-                <div class="stats-icon">
-                    <i class="fas fa-user-clock"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.pending_approvals or 0 }}</h3>
-                    <p>Pending Approvals</p>
-                </div>
-            </div>
-        </div>
-        
-        {% elif role == 'student' %}
-        <div class="col-lg-4 col-md-6 mb-3">
-            <div class="stats-card bg-primary">
-                <div class="stats-icon">
-                    <i class="fas fa-calendar-check"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.attendance or 0 }}%</h3>
-                    <p>Attendance Rate</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mb-3">
-            <div class="stats-card bg-success">
-                <div class="stats-icon">
-                    <i class="fas fa-chart-line"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.avg_percentage or 0 }}%</h3>
-                    <p>Average Grade</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-lg-4 col-md-6 mb-3">
-            <div class="stats-card bg-info">
-                <div class="stats-icon">
-                    <i class="fas fa-trophy"></i>
-                </div>
-                <div class="stats-info">
-                    <h3>{{ stats.avg_grade or 'N/A' }}</h3>
-                    <p>Current Grade</p>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.total_courses or 0 }}</div>
+            <div class="stats-label">Total Courses</div>
+            <i class="fas fa-book stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number text-warning">{{ stats.pending_approvals or 0 }}</div>
+            <div class="stats-label">Pending Approvals</div>
+            <i class="fas fa-clock stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number text-danger">{{ stats.unpaid_fees or 0 }}</div>
+            <div class="stats-label">Unpaid Fees</div>
+            <i class="fas fa-money-bill-wave stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stats-card">
+            <div class="stats-number text-info">{{ unread_count }}</div>
+            <div class="stats-label">Unread Notifications</div>
+            <i class="fas fa-bell stats-icon"></i>
+        </div>
+    </div>
+</div>
+{% elif role == 'teacher' %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.my_students or 0 }}</div>
+            <div class="stats-label">My Students</div>
+            <i class="fas fa-users stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.my_courses or 0 }}</div>
+            <div class="stats-label">My Courses</div>
+            <i class="fas fa-book stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.assessments or 0 }}</div>
+            <div class="stats-label">Assessments</div>
+            <i class="fas fa-tasks stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-warning">{{ stats.pending_approvals or 0 }}</div>
+            <div class="stats-label">Pending Student Approvals</div>
+            <i class="fas fa-clock stats-icon"></i>
+        </div>
+    </div>
+</div>
+{% elif role == 'student' %}
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.attendance or 0 }}%</div>
+            <div class="stats-label">Attendance</div>
+            <i class="fas fa-calendar-check stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.avg_percentage or 0 }}%</div>
+            <div class="stats-label">Average Grade</div>
+            <i class="fas fa-trophy stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number">{{ stats.avg_grade or 'N/A' }}</div>
+            <div class="stats-label">Letter Grade</div>
+            <i class="fas fa-graduation-cap stats-icon"></i>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number {% if stats.fee_status == 'paid' %}text-success{% elif stats.fee_status == 'unpaid' %}text-danger{% else %}text-warning{% endif %}">
+                {{ stats.fee_status.title() if stats.fee_status else 'Unknown' }}
+            </div>
+            <div class="stats-label">Fee Status</div>
+            <i class="fas fa-money-bill-wave stats-icon"></i>
+        </div>
+    </div>
+</div>
+{% endif %}
 
-    <!-- Notifications Section -->
-    <div class="row mb-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-bell me-2"></i>Recent Notifications
-                        {% if unread_count > 0 %}
-                            <span class="badge bg-danger">{{ unread_count }} unread</span>
-                        {% endif %}
-                    </h5>
-                    {% if notifications %}
-                    <div class="btn-group">
-                        {% if role in ['admin', 'teacher'] %}
-                        <a href="{{ url_for('create_notification') }}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-plus me-1"></i>Create New
-                        </a>
-                        {% endif %}
-                        {% if unread_count > 0 %}
-                        <form method="POST" action="{{ url_for('mark_all_read') }}" style="display: inline;">
-                            <button type="submit" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-check-double me-1"></i>Mark All Read
-                            </button>
-                        </form>
-                        {% endif %}
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="card-body">
-                    {% if notifications %}
-                        <div class="notifications-list">
-                            {% for notification in notifications[:5] %}
+<div class="row">
+    <!-- Notifications -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="fas fa-bell me-2"></i>Recent Notifications</h5>
+                {% if unread_count > 0 %}
+                    <span class="badge bg-danger">{{ unread_count }} unread</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if notifications %}
+                    <div class="notification-list" style="max-height: 400px; overflow-y: auto;">
+                        {% for notification in notifications[:5] %}
                             <div class="notification-item {% if not notification.is_read %}unread{% endif %}">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <div class="notification-content flex-grow-1">
-                                        <h6 class="notification-title">
-                                            {% if not notification.is_read %}
-                                                <span class="text-primary">● </span>
-                                            {% endif %}
-                                            {{ notification.title }}
-                                        </h6>
-                                        <p class="notification-message">{{ notification.message }}</p>
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ notification.title }}</h6>
+                                        <p class="mb-2">{{ notification.message[:100] }}{% if notification.message|length > 100 %}...{% endif %}</p>
                                         <small class="text-muted">
-                                            <i class="fas fa-user me-1"></i>{{ notification.creator_name }} • 
-                                            <i class="fas fa-clock me-1"></i>{{ notification.created_at }}
+                                            by {{ notification.creator_name or 'Unknown' }} • {{ notification.created_at }}
                                         </small>
                                     </div>
                                     {% if not notification.is_read %}
-                                    <form method="POST" action="{{ url_for('mark_notification_read', notification_id=notification.notification_id) }}" style="display: inline;">
-                                        <button type="submit" class="btn btn-sm btn-outline-primary">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                    </form>
+                                        <form method="POST" action="{{ url_for('mark_notification_read', notification_id=notification.notification_id) }}" class="ms-2">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                        </form>
                                     {% endif %}
                                 </div>
                             </div>
-                            {% endfor %}
-                            
-                            {% if notifications|length > 5 %}
-                            <div class="text-center mt-3">
-                                <small class="text-muted">Showing 5 of {{ notifications|length }} notifications</small>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-bell-slash fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No notifications available</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Messages -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0"><i class="fas fa-envelope me-2"></i>Recent Messages</h5>
+                <a href="{{ url_for('messages') }}" class="btn btn-outline-primary btn-sm">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_messages %}
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        {% for message in recent_messages %}
+                            <div class="d-flex align-items-center mb-3 p-2 {% if not message.is_read %}bg-light{% endif %} rounded">
+                                <div class="user-avatar me-3" style="width: 40px; height: 40px;">
+                                    {{ message.sender_name[0].upper() if message.sender_name else 'U' }}
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ message.subject }}</h6>
+                                    <small class="text-muted">from {{ message.sender_name or 'Unknown' }}</small>
+                                    <br>
+                                    <small class="text-muted">{{ message.sent_at }}</small>
+                                </div>
+                                <a href="{{ url_for('read_message', message_id=message.message_id) }}" class="btn btn-outline-primary btn-sm">
+                                    <i class="fas fa-eye"></i>
+                                </a>
                             </div>
-                            {% endif %}
-                        </div>
-                    {% else %}
-                        <div class="text-center py-4">
-                            <i class="fas fa-bell-slash fa-3x text-muted mb-3"></i>
-                            <h5>No Notifications</h5>
-                            <p class="text-muted">You're all caught up! No new notifications at this time.</p>
-                            {% if role in ['admin', 'teacher'] %}
-                            <a href="{{ url_for('create_notification') }}" class="btn btn-primary">
-                                <i class="fas fa-plus me-2"></i>Create First Notification
-                            </a>
-                            {% endif %}
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Messages Section -->
-    {% if recent_messages %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-envelope me-2"></i>Recent Messages
-                    </h5>
-                    <a href="{{ url_for('messages') }}" class="btn btn-sm btn-outline-primary">
-                        View All Messages
-                    </a>
-                </div>
-                <div class="card-body">
-                    {% for message in recent_messages %}
-                    <div class="d-flex justify-content-between align-items-center {% if not message.is_read %}bg-light{% endif %} p-2 rounded mb-2">
-                        <div>
-                            <strong>{{ message.sender_name }}</strong>
-                            <span class="text-muted">({{ message.sender_role.title() }})</span><br>
-                            <small>{{ message.subject }}</small>
-                        </div>
-                        <div class="text-end">
-                            <small class="text-muted">{{ message.sent_at }}</small><br>
-                            <a href="{{ url_for('read_message', message_id=message.message_id) }}" class="btn btn-sm btn-primary">Read</a>
-                        </div>
+                        {% endfor %}
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Quick Actions -->
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="card-title mb-0">
-                        <i class="fas fa-bolt me-2"></i>Quick Actions
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        {% if role == 'admin' %}
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('pending_accounts') }}" class="quick-action-card">
-                                <i class="fas fa-user-check"></i>
-                                <span>Review Accounts</span>
-                                {% if pending_accounts_count > 0 %}
-                                    <span class="badge bg-danger">{{ pending_accounts_count }}</span>
-                                {% endif %}
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('manage_courses') }}" class="quick-action-card">
-                                <i class="fas fa-book"></i>
-                                <span>Manage Courses</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('manage_teachers') }}" class="quick-action-card">
-                                <i class="fas fa-chalkboard-teacher"></i>
-                                <span>Manage Teachers</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('manage_students') }}" class="quick-action-card">
-                                <i class="fas fa-users"></i>
-                                <span>Manage Students</span>
-                            </a>
-                        </div>
-                        
-                        {% elif role == 'teacher' %}
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('attendance') }}" class="quick-action-card">
-                                <i class="fas fa-calendar-check"></i>
-                                <span>Mark Attendance</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('create_assessment') }}" class="quick-action-card">
-                                <i class="fas fa-plus-circle"></i>
-                                <span>Create Assessment</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('assessments') }}" class="quick-action-card">
-                                <i class="fas fa-tasks"></i>
-                                <span>Grade Students</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('manage_students') }}" class="quick-action-card">
-                                <i class="fas fa-users"></i>
-                                <span>View Students</span>
-                            </a>
-                        </div>
-                        
-                        {% elif role == 'student' %}
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('attendance') }}" class="quick-action-card">
-                                <i class="fas fa-calendar-check"></i>
-                                <span>My Attendance</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('student_results') }}" class="quick-action-card">
-                                <i class="fas fa-trophy"></i>
-                                <span>My Results</span>
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('messages') }}" class="quick-action-card">
-                                <i class="fas fa-envelope"></i>
-                                <span>Messages</span>
-                                {% if unread_messages_count > 0 %}
-                                    <span class="badge bg-danger">{{ unread_messages_count }}</span>
-                                {% endif %}
-                            </a>
-                        </div>
-                        <div class="col-md-3 mb-3">
-                            <a href="{{ url_for('compose_message') }}" class="quick-action-card">
-                                <i class="fas fa-edit"></i>
-                                <span>Contact Teacher</span>
-                            </a>
-                        </div>
-                        {% endif %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-inbox fa-2x text-muted mb-2"></i>
+                        <p class="text-muted">No messages available</p>
+                        <a href="{{ url_for('compose_message') }}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-edit me-1"></i>Compose Message
+                        </a>
                     </div>
-                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
-
-<style>
-.welcome-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 30px;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
-
-.stats-card {
-    border-radius: 10px;
-    padding: 20px;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.stats-icon {
-    font-size: 2.5rem;
-    opacity: 0.8;
-}
-
-.stats-info h3 {
-    margin: 0;
-    font-size: 2rem;
-    font-weight: bold;
-}
-
-.stats-info p {
-    margin: 0;
-    font-size: 0.9rem;
-    opacity: 0.9;
-}
-
-.notification-item {
-    border-bottom: 1px solid #dee2e6;
-    padding: 15px 0;
-}
-
-.notification-item:last-child {
-    border-bottom: none;
-}
-
-.notification-item.unread {
-    background-color: #f8f9fa;
-    border-left: 4px solid #007bff;
-    padding-left: 15px;
-    border-radius: 4px;
-}
-
-.notification-title {
-    margin-bottom: 5px;
-    color: #333;
-}
-
-.notification-message {
-    margin-bottom: 5px;
-    color: #666;
-}
-
-.quick-action-card {
-    display: block;
-    text-decoration: none;
-    color: #333;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 20px;
-    text-align: center;
-    transition: all 0.3s ease;
-    position: relative;
-}
-
-.quick-action-card:hover {
-    background: #e9ecef;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    text-decoration: none;
-    color: #495057;
-}
-
-.quick-action-card i {
-    font-size: 2rem;
-    margin-bottom: 10px;
-    color: #007bff;
-}
-
-.quick-action-card span {
-    display: block;
-    font-weight: 500;
-}
-
-.quick-action-card .badge {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-}
-</style>
 {% endblock %}

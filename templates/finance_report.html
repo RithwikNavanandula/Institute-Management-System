@@ -1,0 +1,133 @@
+{% extends "layout.html" %}
+
+{% block title %}Finance Report{% endblock %}
+
+{% block main %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h2><i class="fas fa-file-alt me-2 text-primary"></i>Finance Report</h2>
+            <div>
+                <button onclick="window.print()" class="btn btn-outline-primary">
+                    <i class="fas fa-print me-1"></i>Print Report
+                </button>
+                <a href="{{ url_for('finance') }}" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left me-1"></i>Back to Ledger
+                </a>
+            </div>
+        </div>
+        <p class="text-muted">Report Period: {{ start_date }} to {{ end_date }}</p>
+    </div>
+</div>
+
+<!-- Summary Section -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-success">₹{{ "{:,.2f}".format(total_income) }}</div>
+            <div class="stats-label">Total Income</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-danger">₹{{ "{:,.2f}".format(total_expenditure) }}</div>
+            <div class="stats-label">Total Expenditure</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number {% if net_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                ₹{{ "{:,.2f}".format(net_balance) }}
+            </div>
+            <div class="stats-label">Net Balance</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="stats-number text-info">{{ transactions|length }}</div>
+            <div class="stats-label">Total Transactions</div>
+        </div>
+    </div>
+</div>
+
+<!-- Daily Summary -->
+{% if daily_summary %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="fas fa-calendar me-2"></i>Daily Summary</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th class="text-success">Income</th>
+                        <th class="text-danger">Expenditure</th>
+                        <th>Daily Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for date, summary in daily_summary.items() %}
+                        <tr>
+                            <td>{{ date }}</td>
+                            <td class="text-success">₹{{ "{:,.2f}".format(summary.income) }}</td>
+                            <td class="text-danger">₹{{ "{:,.2f}".format(summary.expenditure) }}</td>
+                            <td class="{% if (summary.income - summary.expenditure) >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                ₹{{ "{:,.2f}".format(summary.income - summary.expenditure) }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Detailed Transactions -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="card-title mb-0"><i class="fas fa-list me-2"></i>Detailed Transactions</h5>
+    </div>
+    <div class="card-body">
+        {% if transactions %}
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for transaction in transactions %}
+                            <tr>
+                                <td>{{ transaction.date }}</td>
+                                <td>
+                                    {% if transaction.transaction_type == 'income' %}
+                                        <span class="badge bg-success">Income</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Expenditure</span>
+                                    {% endif %}
+                                </td>
+                                <td class="{% if transaction.transaction_type == 'income' %}text-success{% else %}text-danger{% endif %}">
+                                    ₹{{ "{:,.2f}".format(transaction.amount) }}
+                                </td>
+                                <td>{{ transaction.description }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No transactions found for this period</h5>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
