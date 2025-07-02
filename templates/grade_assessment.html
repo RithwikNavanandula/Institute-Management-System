@@ -18,7 +18,7 @@
                 </div>
             </div>
             <div class="card-body">
-                <form method="POST" action="{{ url_for('submit_grades') }}">
+                <form method="POST" action="{{ url_for('submit_grades', assessment_id=assessment.assessment_id) }}">
                     <input type="hidden" name="assessment_id" value="{{ assessment.assessment_id }}">
                     
                     <div class="table-responsive">
@@ -34,39 +34,40 @@
                             </thead>
                             <tbody>
                                 {% for student in students %}
-                                {% set existing_grade = grade_map.get(student.student_id) %}
+                                {% set existing_grade = grades.get(student.student_id) %}
                                 <tr>
                                     <td>
-                                        <i class="fas fa-user-circle fa-lg text-primary me-2"></i>
                                         <strong>{{ student.name }}</strong>
                                     </td>
-                                    <td class="text-muted">{{ student.email }}</td>
                                     <td>
-                                        <input type="number" 
-                                               class="form-control" 
-                                               name="marks_{{ student.student_id }}" 
-                                               min="0" 
-                                               max="{{ assessment.total_marks }}"
-                                               step="0.5"
-                                               value="{{ existing_grade.obtained_marks if existing_grade else '' }}"
-                                               placeholder="0 - {{ assessment.total_marks }}"
-                                               style="width: 120px;">
+                                        <small class="text-muted">{{ student.email }}</small>
                                     </td>
                                     <td>
-                                        {% if existing_grade %}
-                                            <span class="badge bg-{% if existing_grade.percentage >= 90 %}success{% elif existing_grade.percentage >= 70 %}warning{% elif existing_grade.percentage >= 50 %}info{% else %}danger{% endif %}">
+                                        <input type="number" 
+                                            name="marks_{{ student.student_id }}" 
+                                            class="form-control marks-input" 
+                                            min="0" 
+                                            max="{{ assessment.total_marks }}" 
+                                            step="0.5"
+                                            value="{{ existing_grade.obtained_marks if existing_grade else '' }}"
+                                            data-total-marks="{{ assessment.total_marks }}"
+                                            data-student-id="{{ student.student_id }}">
+                                    </td>
+                                    <td>
+                                        <span class="percentage-display" id="percentage_{{ student.student_id }}">
+                                            {% if existing_grade %}
                                                 {{ "%.1f"|format(existing_grade.percentage) }}%
-                                            </span>
-                                        {% else %}
-                                            <span class="text-muted">-</span>
-                                        {% endif %}
+                                            {% else %}
+                                                0%
+                                            {% endif %}
+                                        </span>
                                     </td>
                                     <td>
                                         <input type="text" 
-                                               class="form-control" 
-                                               name="remarks_{{ student.student_id }}" 
-                                               value="{{ existing_grade.remarks if existing_grade else '' }}"
-                                               placeholder="Optional remarks">
+                                            name="remarks_{{ student.student_id }}" 
+                                            class="form-control" 
+                                            placeholder="Optional remarks"
+                                            value="{{ existing_grade.remarks if existing_grade else '' }}">
                                     </td>
                                 </tr>
                                 {% endfor %}
@@ -74,19 +75,13 @@
                         </table>
                     </div>
                     
-                    <div class="d-flex justify-content-between align-items-center mt-4">
-                        <div class="text-muted">
-                            <i class="fas fa-info-circle me-1"></i>
-                            Percentages will be calculated automatically when you save grades
-                        </div>
-                        <div class="d-flex gap-2">
-                            <a href="{{ url_for('assessments') }}" class="btn btn-secondary">
-                                <i class="fas fa-arrow-left me-1"></i>Back to Assessments
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i>Save All Grades
-                            </button>
-                        </div>
+                    <div class="d-flex justify-content-between mt-3">
+                        <a href="{{ url_for('assessments') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Assessments
+                        </a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save me-1"></i>Save Grades
+                        </button>
                     </div>
                 </form>
             </div>

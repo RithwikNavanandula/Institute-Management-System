@@ -15,18 +15,6 @@
                 </a>
             </div>
             <div class="card-body">
-                <!-- Course Filter -->
-                <div class="row mb-3">
-                    <div class="col-md-4">
-                        <select class="form-select" id="courseFilter" onchange="filterByCourse()">
-                            <option value="">All Courses</option>
-                            {% for course in courses %}
-                            <option value="{{ course.course_name }}">{{ course.course_name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
                 <!-- Recent Assessments -->
                 <h5 class="mb-3">Recent Assessments</h5>
                 {% if recent_assessments %}
@@ -46,7 +34,7 @@
                         </thead>
                         <tbody>
                             {% for assessment in recent_assessments %}
-                            <tr data-course="{{ assessment.course_name }}">
+                            <tr>
                                 <td>
                                     <strong>{{ assessment.assessment_name }}</strong>
                                     {% if assessment.description %}
@@ -61,10 +49,16 @@
                                 </td>
                                 <td>{{ assessment.total_marks }}</td>
                                 <td>{{ assessment.weightage }}%</td>
-                                <td>{{ assessment.assessment_date }}</td>
+                                <td>
+                                    {% if assessment.assessment_date %}
+                                        {{ assessment.assessment_date }}
+                                    {% else %}
+                                        <span class="text-muted">Not set</span>
+                                    {% endif %}
+                                </td>
                                 <td>
                                     <div class="d-flex align-items-center">
-                                        <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                        <div class="progress flex-grow-1 me-2">
                                             {% set progress = (assessment.graded_count / assessment.total_students * 100) if assessment.total_students > 0 else 0 %}
                                             <div class="progress-bar bg-success" style="width: {{ progress }}%"></div>
                                         </div>
@@ -80,7 +74,9 @@
                                         </a>
                                         {% if user_role == 'admin' %}
                                         <button type="button" class="btn btn-danger btn-sm" 
-                                                onclick="deleteAssessment({{ assessment.assessment_id }}, '{{ assessment.assessment_name }}')">
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteModal"
+                                                onclick="setDeleteForm({{ assessment.assessment_id }}, '{{ assessment.assessment_name }}')">
                                             <i class="fas fa-trash me-1"></i>Delete
                                         </button>
                                         {% endif %}
@@ -120,7 +116,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form id="deleteForm" method="POST" style="display: inline;">
+                <form id="deleteForm" method="POST">
                     <button type="submit" class="btn btn-danger">Delete Assessment</button>
                 </form>
             </div>
@@ -128,48 +124,10 @@
     </div>
 </div>
 
-<style>
-.progress {
-    background-color: #e9ecef;
-}
-
-.table th {
-    background-color: #f8f9fa;
-    border-top: none;
-    font-weight: 600;
-}
-
-.badge {
-    font-size: 0.75rem;
-}
-
-.btn-group-vertical .btn {
-    margin-bottom: 2px;
-}
-
-.btn-group-vertical .btn:last-child {
-    margin-bottom: 0;
-}
-</style>
-
 <script>
-function filterByCourse() {
-    const filter = document.getElementById('courseFilter').value;
-    const rows = document.querySelectorAll('tbody tr[data-course]');
-    
-    rows.forEach(row => {
-        if (filter === '' || row.getAttribute('data-course') === filter) {
-            row.style.display = '';
-        } else {
-            row.style.display = 'none';
-        }
-    });
-}
-
-function deleteAssessment(assessmentId, assessmentName) {
+function setDeleteForm(assessmentId, assessmentName) {
     document.getElementById('assessmentName').textContent = assessmentName;
-    document.getElementById('deleteForm').action = `/delete_assessment/${assessmentId}`;
-    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+    document.getElementById('deleteForm').action = '/delete_assessment/' + assessmentId;
 }
 </script>
 {% endblock %}

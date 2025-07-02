@@ -1319,37 +1319,73 @@ def delete_teacher(teacher_id):
 
     return redirect(url_for('manage_teachers'))
 
-# ASSESSMENT ROUTES
 @app.route('/assessments')
 @teacher_or_admin_required
 def assessments():
-    """View all assessments"""
     user_id = session.get("user_id")
     user_role = session.get("user_role")
 
     try:
+        # Get courses for filter dropdown
+        courses = execute_db("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
+        
         if user_role == 'admin':
-            assessments = execute_db("""
-                SELECT a.*, t.name as teacher_name, COUNT(g.grade_id) as student_count
+            recent_assessments = execute_db("""
+                SELECT a.*, 
+                       t.name as teacher_name,
+                       COUNT(DISTINCT s.student_id) as total_students,
+                       COUNT(DISTINCT g.grade_id) as graded_count
                 FROM assessments a
                 LEFT JOIN teachers t ON a.teacher_id = t.teacher_id
+                LEFT JOIN students s ON a.course_name = s.course AND s.status = 1
                 LEFT JOIN grades g ON a.assessment_id = g.assessment_id
+                WHERE a.status = 'active'
                 GROUP BY a.assessment_id
                 ORDER BY a.created_at DESC
             """)
         else:
-            assessments = execute_db("""
-                SELECT a.*, COUNT(g.grade_id) as student_count
+            recent_assessments = execute_db("""
+                SELECT a.*, 
+                       COUNT(DISTINCT s.student_id) as total_students,
+                       COUNT(DISTINCT g.grade_id) as graded_count
                 FROM assessments a
+                LEFT JOIN students s ON a.course_name = s.course AND s.status = 1
                 LEFT JOIN grades g ON a.assessment_id = g.assessment_id
-                WHERE a.teacher_id = ?
+                WHERE a.teacher_id = ? AND a.status = 'active'
                 GROUP BY a.assessment_id
                 ORDER BY a.created_at DESC
             """, user_id)
-    except:
-        assessments = []
+            
+    except Exception as e:
+        print(f"Database error: {e}")
+        courses = []
+        recent_assessments = []
 
-    return render_template('assessments.html', assessments=assessments)
+    return render_template('assessments.html', 
+                         recent_assessments=recent_assessments,
+                         courses=courses,
+                         user_role=user_role)
+
+@app.route('/delete_assessment/<int:assessment_id>', methods=['POST'])
+@admin_required
+def delete_assessment(assessment_id):
+    """Delete an assessment (Admin only)"""
+    try:
+        # Check if assessment has grades
+        grades = execute_db("SELECT COUNT(*) as count FROM grades WHERE assessment_id = ?", assessment_id)
+        if grades[0]['count'] > 0:
+            flash("Cannot delete assessment with existing grades. Please remove grades first.")
+            return redirect(url_for('assessments'))
+
+        # Delete the assessment
+        execute_db_commit("DELETE FROM assessments WHERE assessment_id = ?", assessment_id)
+        flash("Assessment deleted successfully!")
+
+    except Exception as e:
+        print(f"Error deleting assessment: {str(e)}")
+        flash("Error deleting assessment.")
+
+    return redirect(url_for('assessments'))
 
 @app.route('/create_assessment')
 @teacher_or_admin_required
