@@ -1542,10 +1542,30 @@ def student_results():
 def all_student_results():
     """View all student results"""
     course_filter = request.args.get('course', '')
-
+    
     try:
+        # Base query for students with their course results
         query = """
-            SELECT s.student_id, s.name, s.course, cr.final_percentage, cr.final_grade, cr.status
+            SELECT s.student_id, s.name, s.email, s.course, s.status,
+                   AVG(cr.final_percentage) as avg_percentage,
+                   COUNT(DISTINCT cr.course_name) as total_courses,
+                   CASE 
+                       WHEN AVG(cr.final_percentage) >= 90 THEN 'A+'
+                       WHEN AVG(cr.final_percentage) >= 85 THEN 'A'
+                       WHEN AVG(cr.final_percentage) >= 80 THEN 'A-'
+                       WHEN AVG(cr.final_percentage) >= 75 THEN 'B+'
+                       WHEN AVG(cr.final_percentage) >= 70 THEN 'B'
+                       WHEN AVG(cr.final_percentage) >= 65 THEN 'B-'
+                       WHEN AVG(cr.final_percentage) >= 60 THEN 'C+'
+                       WHEN AVG(cr.final_percentage) >= 55 THEN 'C'
+                       WHEN AVG(cr.final_percentage) >= 50 THEN 'C-'
+                       WHEN AVG(cr.final_percentage) >= 45 THEN 'D'
+                       ELSE 'F'
+                   END as final_grade,
+                   CASE 
+                       WHEN AVG(cr.final_percentage) >= 50 THEN 'Pass'
+                       ELSE 'Fail'
+                   END as status
             FROM students s
             LEFT JOIN course_results cr ON s.student_id = cr.student_id
             WHERE s.status = 1
@@ -1556,16 +1576,39 @@ def all_student_results():
             query += " AND s.course = ?"
             params.append(course_filter)
 
-        query += " ORDER BY s.name"
+        query += " GROUP BY s.student_id ORDER BY s.name"
 
-        results = execute_db(query, *params)
-        courses = execute_db("SELECT DISTINCT course_name FROM courses")
+        raw_results = execute_db(query, *params)
+        
+        # Transform data to match template expectations
+        student_performance = []
+        for row in raw_results:
+            performance = {
+                'student_info': {
+                    'student_id': row['student_id'],
+                    'name': row['name'],
+                    'email': row['email'],
+                    'course': row['course']
+                },
+                'avg_percentage': round(row['avg_percentage'], 1) if row['avg_percentage'] else 0,
+                'final_grade': row['final_grade'] if row['avg_percentage'] else 'N/A',
+                'status': row['status'] if row['avg_percentage'] else 'No Results',
+                'total_courses': row['total_courses'] or 0
+            }
+            student_performance.append(performance)
 
-    except:
-        results = []
+        # Get courses for filter
+        courses = execute_db("SELECT DISTINCT course_name FROM courses ORDER BY course_name")
+
+    except Exception as e:
+        print(f"Error in all_student_results: {str(e)}")
+        student_performance = []
         courses = []
 
-    return render_template('all_student_results.html', results=results, courses=courses)
+    return render_template('all_student_results.html', 
+                         student_performance=student_performance, 
+                         courses=courses,
+                         course_filter=course_filter)
 
 # ATTENDANCE ROUTES
 @app.route('/attendance')
